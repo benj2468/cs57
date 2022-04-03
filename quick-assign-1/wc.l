@@ -5,7 +5,7 @@
 %}
 
 %%
-\n|\r 			line_count++;
+\n|\r 			{ line_count++; char_count ++; }
 [0-9A-Za-z\-]+		{ word_count++; char_count += yyleng;  }
 .			char_count++;
 %%
