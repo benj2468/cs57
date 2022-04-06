@@ -25,3 +25,13 @@ char rot(char c)
 	return (char)mapped;
 }
 
+int main (int argc, char **argv)
+{
+	argc--;
+	if (argc > 0)
+		yyin = fopen (argv[1], "r");
+	else
+		yyin = stdin;
+  	yylex();  // kick off the lexer
+}
+

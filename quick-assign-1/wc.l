@@ -10,8 +10,13 @@
 .			char_count++;
 %%
 
-int main ()
+int main (int argc, char **argv)
 {
-  yylex();  // kick off the lexer
-  printf ("Chars: %d, Words: %d, Lines: %d\n", char_count, word_count, line_count);
+	argc--;
+	if (argc > 0)
+		yyin = fopen (argv[1], "r");
+	else
+		yyin = stdin;
+  	yylex();  // kick off the lexer
+  	printf ("Chars: %d, Words: %d, Lines: %d\n", char_count, word_count, line_count);
 }

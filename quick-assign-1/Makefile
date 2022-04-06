@@ -13,11 +13,11 @@ caesar-encode: caesar-encode.o
 caesar-decode: caesar-decode.o
 	$(CC) -o $@ $(LDFLAGS) $^
 
-test-coder: caesar-encode caesar-decode
-	rm encoded.txt decoded.txt
-	./caesar-encode < test.txt >> encoded.txt
-	./caesar-decode < encoded.txt >> decoded.txt
+test: caesar-encode caesar-decode
+	rm -f encoded.txt decoded.txt
+	./caesar-encode test.txt >> encoded.txt
+	./caesar-decode encoded.txt >> decoded.txt
 	cmp test.txt decoded.txt
 
 clean:
-	rm *.o wc caesar-encode caesar-decode encoded.txt decoded.txt
+	rm -f *.o wc caesar-encode caesar-decode encoded.txt decoded.txt
