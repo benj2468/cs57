@@ -1,0 +1,21 @@
+add @bob
+Add @sally
+ADD @Xiang
+AdD @lin
+ADD @marySmith_03755
+SEND @tom This is an 80 character message I think yes it is tough to make one for this 12.
+send @carina Will you be at home later.
+BLAST Hi there!
+blast hi this is a blast message. It goes out to all my contacts.
+EXIT
+
+new this command doesn't exist
+add @bobbyjones_03755
+add @did't check the rules
+send
+sendall
+send @jie What's going on?
+blast
+exit when I want to
+send @billy This is an over 80 character message I think yes it is tough to make one for this long but I will do it anyway.
+BLAST Are you there?
