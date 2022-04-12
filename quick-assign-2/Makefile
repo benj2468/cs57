@@ -1,15 +1,13 @@
-ANTLR4=java -jar /usr/local/lib/antlr-4.9.2-complete.jar
 
 all: bluster-antlr bluster-bison
 
-bluster-antlr: antlr/
-	$(ANTLR4) -Dlanguage=Python3 antlr/BlusterGrammer.g4 -o antlr/dist
+bluster-antlr: 
+	cd antlr && make
 
-bluster-bison:  bison/
-	bison -d bison/bluster.y -o bison/bluster.tab.c
-	flex -o bison/lex.yy.c bison/bluster.lex 
-	cc -o bison/$@ bison/bluster.tab.c bison/lex.yy.c
+bluster-bison:
+	cd bison && make
+	
 
 clean:
 	rm -f -R antlr/dist/* 
-	rm -f bison/*.tab.* bison/bluster-bison bison/lex.yy.c
+	rm -f bison/*.tab.* bison/bluster bison/lex.yy.c

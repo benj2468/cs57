@@ -1,3 +1,11 @@
+# Quick Assignment #2 (ANTLR + BISON)
+
+## How to Run:
+
+1. run `make` in the root
+2. To run the antlr version, run `python3 antlr/main.py`
+3. To run the bison version, run `bison/bluster`
+
 # TODO
 
 ## Bison
