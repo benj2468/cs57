@@ -1,9 +1,13 @@
 grammar BlusterGrammer;
 
-expr	:	EXIT EOF							# ExitExpr
-	|	BLAST MESSAGE EOF					# BlastExpr
-	|	SEND SPACE USER MESSAGE EOF			# SendExpr
-	|	ADD SPACE USER EOF					# AddExpr
+// Start rule
+start: line (EOL line)* EOF;
+
+line:	EXIT							# ExitExpr
+	|	BLAST MESSAGE					# BlastExpr
+	|	SEND SPACE USER MESSAGE			# SendExpr
+	|	ADD SPACE USER					# AddExpr
+	|	.								# UnRecExpr
 	;
 
 MESSAGE: 	(SPACE WORD)+			;

@@ -1,4 +1,4 @@
-ANTLR4=antlr4
+ANTLR4=java -jar /usr/local/lib/antlr-4.9.2-complete.jar
 
 all: bluster-antlr bluster-bison
 
@@ -9,3 +9,7 @@ bluster-bison:  bison/
 	bison -d bison/bluster.y -o bison/bluster.tab.c
 	flex -o bison/lex.yy.c bison/bluster.lex 
 	cc -o bison/$@ bison/bluster.tab.c bison/lex.yy.c
+
+clean:
+	rm -f -R antlr/dist/* 
+	rm -f bison/*.tab.* bison/bluster-bison bison/lex.yy.c

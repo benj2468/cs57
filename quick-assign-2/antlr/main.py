@@ -58,27 +58,13 @@ class BlusterListener(ParseTreeListener):
         user = is_user_valid(ctx.USER())
         print(f"Adding User: {user}")
 
+    # Enter a parse tree produced by BlusterGrammerParser#UnRecExpr.
+    def enterUnRecExpr(self, ctx: BlusterGrammerParser.UnRecExprContext):
+        pass
 
-def main():
-    while 1:
-        data = InputStream(input(">>> "))
-        # lexer
-        lexer = BlusterGrammerLexer(data)
-
-        stream = CommonTokenStream(lexer)
-        # parser
-        parser = BlusterGrammerParser(stream)
-        try:
-            tree = parser.expr()
-
-            # evaluator
-            visitor = BlusterVisitor()
-            output = visitor.visit(tree)
-            if not output:
-                raise Exception("Could not parse for some reason")
-            print(output)
-        except Exception as e:
-            print(f"ERROR Invalid tokens: {e} (see above errors if None)")
+    # Exit a parse tree produced by BlusterGrammerParser#UnRecExpr.
+    def exitUnRecExpr(self, ctx: BlusterGrammerParser.UnRecExprContext):
+        raise Exception("UNRECOGNIZED COMMAND")
 
 
 def main(argv):
@@ -87,7 +73,7 @@ def main(argv):
         input_stream = StdinStream()
     else:
         input_stream = FileStream(argv[1])
-        print(argv[1], ' ', end='')
+        print(argv[1], ' ', end='\n')
 
     # Tokenize the input
     lexer = BlusterGrammerLexer(input_stream)
@@ -95,7 +81,10 @@ def main(argv):
 
     # Parse it
     parser = BlusterGrammerParser(stream)
-    tree = parser.expr()
+    parser._errHandler = BailErrorStrategy()
+    tree = parser.start()
+
+    print(tree.exception)
 
     # Walk the tree, counting up words
     listener = BlusterListener()
