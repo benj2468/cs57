@@ -1,5 +1,5 @@
 
 Good Morning!
 This file should have 15  words
-and 4 lines
+and 4 lines-of-code
 and lots of characters;
