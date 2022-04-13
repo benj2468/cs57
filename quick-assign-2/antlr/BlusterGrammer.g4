@@ -21,4 +21,3 @@ USER:		'@'[a-zA-Z0-9_]+		;
 WORD:		[a-zA-Z0-9_.,!]+		;
 SPACE:		[ \t]+ 					;
 EOL:		[\n\r]					;
-WS: 		[ \n\t\r]+ -> skip		;

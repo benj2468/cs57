@@ -1,15 +1,18 @@
+from io import DEFAULT_BUFFER_SIZE
 import sys
 from antlr4 import *
-from dist.antlr.BlusterGrammerLexer import BlusterGrammerLexer
-from dist.antlr.BlusterGrammerParser import BlusterGrammerParser
+from dist.BlusterGrammerLexer import BlusterGrammerLexer
+from dist.BlusterGrammerParser import BlusterGrammerParser
 from typing import List
 
-MESSAGE_MAX_LEN = 81
+MESSAGE_MAX_LEN = 80
 USER_MAX_LEN = 16
+
+DEFAULT_ERROR_MESSAGE = lambda e: f"There was an error parsing your input, maybe you mistyped? Try starting with ADD, SEND, or BLAST! {e}"
 
 
 def is_message_valid(message: List[tree.Tree.TerminalNodeImpl]):
-    if len(message.getText()) > MESSAGE_MAX_LEN:
+    if len(message.getText().strip()) > MESSAGE_MAX_LEN:
         raise Exception("MESSAGE TOO LONG")
     return message
 
@@ -82,14 +85,19 @@ def main(argv):
     # Parse it
     parser = BlusterGrammerParser(stream)
     parser._errHandler = BailErrorStrategy()
-    tree = parser.start()
+    try:
+        tree = parser.start()
 
-    print(tree.exception)
-
-    # Walk the tree, counting up words
-    listener = BlusterListener()
-    walker = ParseTreeWalker()
-    walker.walk(listener, tree)
+        # Walk the tree, counting up words
+        listener = BlusterListener()
+        walker = ParseTreeWalker()
+        walker.walk(listener, tree)
+    except NoViableAltException as e:
+        print(DEFAULT_ERROR_MESSAGE(e))
+    except RecognitionException as e:
+        print(DEFAULT_ERROR_MESSAGE(e))
+    except Exception as e:
+        print(DEFAULT_ERROR_MESSAGE(e))
 
 
 if __name__ == "__main__":
