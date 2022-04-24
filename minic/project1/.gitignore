@@ -1,2 +1,5 @@
-src/.*
-src/dist
+.DS_*
+
+src/.antlr/*
+src/dist/*
+src/__pycache__

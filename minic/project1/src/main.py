@@ -2,7 +2,7 @@ import sys
 from antlr4 import *
 from dist.MiniCLexer import MiniCLexer
 from dist.MiniCParser import MiniCParser
-from dist.MiniCListener import MiniCListener
+from MiniCListener import MyMiniCListener
 
 
 def main(argv):
@@ -23,16 +23,10 @@ def main(argv):
     try:
         tree = parser.start()
 
-        print(tree.toStringTree(recog=parser))
-
         # Walk the tree, counting up words
-        listener = MiniCListener()
+        listener = MyMiniCListener()
         walker = ParseTreeWalker()
         walker.walk(listener, tree)
-    except NoViableAltException as e:
-        print(e)
-    except RecognitionException as e:
-        print(e)
     except Exception as e:
         print(e)
 
