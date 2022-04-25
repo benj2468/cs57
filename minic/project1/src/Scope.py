@@ -71,25 +71,17 @@ class Scope(Identifiable):
         super().__init__(ident)
         self.vars: Mapping[str, TypedVar] = {}
         self.functions: Mapping[str, Function] = {}
-        self.parent = None
+        self.parent: Scope = None
+        self.ty: ScopeType = ty
 
     def new_sub_scope(self):
         """
         Create a new sub scope
         """
-        scope = Scope()
+        scope = Scope(ty=self.ty)
         scope.parent = self
 
         return scope
-
-    def new_while(self):
-        """
-        Create a new while loop
-        """
-        loop = While()
-        loop.parent = self
-        loop.ty = ScopeType.LOOP
-        return loop
 
     def add_var(self, arg: TypedVar):
         """
@@ -99,6 +91,8 @@ class Scope(Identifiable):
             return
         if arg.ident in self.vars:
             raise TwiceDefinedException(arg)
+        if self.ty == ScopeType.LOOP:
+            raise Exception("Cannot declare variables within a loop")
 
         self.vars[arg.ident] = arg
 
@@ -110,6 +104,8 @@ class Scope(Identifiable):
             return
         if func.ident in self.functions:
             raise TwiceDefinedException(func)
+        if self.ty == ScopeType.LOOP:
+            raise Exception("Cannot declare functions within a loop")
 
         func.parent = self
         self.functions[func.ident] = func
@@ -145,6 +141,17 @@ class Scope(Identifiable):
                 )
 
         return self.functions[func.ident]
+
+    def check_assignment(self, assgn: MiniCParser.AssignmentContext):
+        """
+        Check if an assignment is valid
+        """
+        variable_ty = self.check_var(assgn.variable().ident.text).type
+        expr_type = self.expr_type_calculator(assgn.expr())
+        if variable_ty != expr_type:
+            raise TypeError(
+                f"Type mismatch: got {expr_type}, but expected {variable_ty}"
+            )
 
     def expr_type_calculator(self, ctx: MiniCParser.ExprContext):
         def isTypeUOperable(ty: str):
@@ -188,33 +195,12 @@ class Scope(Identifiable):
             elif term.string:
                 return "str"
         elif type(ctx) == MiniCParser.FuncCallExprContext:
-            return self.check_function[ctx.ident.text].type
+            func = Function.from_call_ctx(self, ctx.funccall())
+            return self.check_function(func).type
         elif type(ctx) == MiniCParser.ParenExprContext:
             return self.expr_type_calculator(ctx.expr())
 
         raise Exception("Unknown Exception, error in parsing expression type")
-
-
-class While(Scope):
-    """
-    While Loop Class
-    """
-
-    def __init__(self):
-        super().__init__(ty=ScopeType.LOOP)
-        self.condition = None
-
-
-class IfElse(Scope):
-    """
-    IfElse Loop Class
-    """
-
-    def __init__(self):
-        super().__init__(ty=ScopeType.LOOP)
-        self.condition = None
-        self.if_scope = None
-        self.else_scope = None
 
 
 class Function(Scope):

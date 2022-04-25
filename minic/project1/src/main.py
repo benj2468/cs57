@@ -1,8 +1,7 @@
 import sys
 from antlr4 import *
 from dist.MiniCLexer import MiniCLexer
-from dist.MiniCParser import MiniCParser
-from MiniCListener import MyMiniCListener
+from MiniCParser import MyMiniCParser
 
 
 def main(argv):
@@ -18,17 +17,14 @@ def main(argv):
     stream = CommonTokenStream(lexer)
 
     # Parse it
-    parser = MiniCParser(stream)
+    parser = MyMiniCParser(stream)
 
     try:
-        tree = parser.start()
+        # Parse the AST
+        ast = parser.parse()
 
-        # Walk the tree, counting up words
-        listener = MyMiniCListener()
-        walker = ParseTreeWalker()
-        walker.walk(listener, tree)
-
-        listener.ast.print()
+        # Print the tree
+        ast.print()
 
     except Exception as e:
         print(e.with_traceback())
