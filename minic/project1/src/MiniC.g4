@@ -30,9 +30,9 @@ funccall: ident = WORD LPAREN (expr (COMMA expr)*)? RPAREN;
 // Expressions
 expr:
 	// A Binary expression with a left and a right component
-	left = term B_OP right = term # BinOp
+	left = expr B_OP right = expr # BinOp
 	// A unary expression with a right component
-	| U_OP term # UnOp
+	| U_OP expr # UnOp
 	// A comparator expression with a left and a right component
 	| left = expr C_OP right = expr # CompOp
 	// An expression can also just be a regular term
@@ -41,7 +41,7 @@ expr:
 	| funccall # FuncCallExpr;
 
 // A Term is either a variable (WORD) or a literal (INTEGER, (etc, if we wanted to implement more))
-term: ident = variable | value = NUMBER;
+term: ident = variable | number = NUMBER | string = stringlit;
 
 // Statements
 stmt:
@@ -69,6 +69,8 @@ block: LBRACKET stmt* RBRACKET;
 arg: ty = WORD ident = variable;
 // A variable is a subcomponent of a many things, and we always want to check it's validity so we extract it here
 variable: ident = WORD;
+// A string is a string literal
+stringlit: DQUOTE literal = WORD DQUOTE;
 
 // Keywords
 EXTERN: 'extern';
@@ -92,6 +94,7 @@ COMMA: ',';
 LBRACKET: '{';
 RBRACKET: '}';
 SEMICOLON: ';';
+DQUOTE: '"';
 
 // Spaces
 // 

@@ -56,7 +56,7 @@ class MyMiniCListener(MiniCListener):
 
     # Enter a parse tree produced by MiniCParser#funccall.
     def enterFunccall(self, ctx: MiniCParser.FunccallContext):
-        function = Function.from_ctx(ctx)
+        function = Function.from_call_ctx(self.scope, ctx)
         self.scope.check_function(function)
 
     # Exit a parse tree produced by MiniCParser#funccall.
@@ -69,14 +69,6 @@ class MyMiniCListener(MiniCListener):
 
     # Exit a parse tree produced by MiniCParser#UnOp.
     def exitUnOp(self, ctx: MiniCParser.UnOpContext):
-        pass
-
-    # Enter a parse tree produced by MiniCParser#ErrorExpr.
-    def enterErrorExpr(self, ctx: MiniCParser.ErrorExprContext):
-        pass
-
-    # Exit a parse tree produced by MiniCParser#ErrorExpr.
-    def exitErrorExpr(self, ctx: MiniCParser.ErrorExprContext):
         pass
 
     # Enter a parse tree produced by MiniCParser#CompOp.

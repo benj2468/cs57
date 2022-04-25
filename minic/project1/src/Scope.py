@@ -3,14 +3,55 @@ from typing import List, Mapping
 
 from dist.MiniCParser import MiniCParser
 
-SUPPORTED_TYPES = ['int', 'void', '']
+SUPPORTED_TYPES = ['int', 'void', 'string', '']
 
 
-def expr_type_calculator(ctx: MiniCParser.ExprContext):
+def expr_type_calculator(scope: Scope, ctx: MiniCParser.ExprContext):
+
+    def isTypeUOperable(ty: str):
+        if (ty in ['int', 'bool', 'void']):
+            return True
+        return False
+
+    def areTypesComparable(a: str, b: str):
+        if a == b:
+            return True
+        return False
+
     """
     Calculate the evaluated type of the expression
     """
-    return 'int'
+    if (type(ctx) == MiniCParser.BinOpContext):
+        leftTy = expr_type_calculator(scope, ctx.left)
+        rightTy = expr_type_calculator(scope, ctx.right)
+        if (leftTy != rightTy):
+            raise TypeError("Type mismatch in binary operation")
+        return leftTy
+    elif (type(ctx) == MiniCParser.UnOpContext):
+        exprTy = expr_type_calculator(scope, ctx.expr())
+        if not isTypeUOperable(exprTy):
+            raise TypeError("Cannot perform unary operation on type " + exprTy)
+        return exprTy
+    elif (type(ctx) == MiniCParser.CompOpContext):
+        leftTy = expr_type_calculator(scope, ctx.left)
+        rightTy = expr_type_calculator(scope, ctx.right)
+        if not areTypesComparable(leftTy, rightTy):
+            raise TypeError("Unable to compare two types " + leftTy + " and " +
+                            rightTy)
+        return leftTy
+    elif (type(ctx) == MiniCParser.TermExprContext):
+        term = ctx.term()
+        if term.ident:
+            return scope.vars[term.ident.text].type
+        elif term.number:
+            return 'int'
+        elif term.string:
+            return 'string'
+    elif (type(ctx) == MiniCParser.FuncCallExprContext):
+        func = scope.functions[ctx.ident.text]
+        return func.type
+
+    raise Exception("Unknown Exception, error in parsing expression type")
 
 
 class MiniCException(Exception):
@@ -19,15 +60,6 @@ class MiniCException(Exception):
         self.ctx = ctx
 
     def __repr__(self):
-        return f"TypeError: Undefined Type: {self.type}"
-
-
-class TypeError(Exception):
-
-    def __init__(self, type: str):
-        self.type = type
-
-    def __str__(self):
         return f"TypeError: Undefined Type: {self.type}"
 
 
@@ -96,11 +128,10 @@ class Function(Identifiable):
 
         return Function(ctx.ty.text, ctx.ident.text, args)
 
-    def from_call_ctx(ctx: MiniCParser.FunccallContext):
+    def from_call_ctx(scope: Scope, ctx: MiniCParser.FunccallContext):
         args = []
         for arg in ctx.expr():
-
-            ty = expr_type_calculator(arg)
+            ty = expr_type_calculator(scope, arg)
             args.append(TypedVar('', ty))
         return Function('', ctx.ident.text, args)
 
@@ -169,5 +200,5 @@ class Scope():
         caller = self.functions[func.ident]
         for i, arg in enumerate(caller.args):
             if arg.type != func.args[i].type:
-                raise Exception("Mismatched Argument Types: " + arg.type +
-                                " and " + func.args[i].type)
+                raise Exception("Mismatched Argument Types: got " + arg.type +
+                                ", but expected " + func.args[i].type)
