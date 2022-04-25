@@ -5,7 +5,7 @@ from prometheus_client import Enum
 
 from dist.MiniCParser import MiniCParser
 
-SUPPORTED_TYPES = ["int", "void", "string", ""]
+SUPPORTED_TYPES = ["int", "void", "str", ""]
 
 
 class MiniCException(Exception):
@@ -95,6 +95,8 @@ class Scope(Identifiable):
         """
         Add a variable to the scope
         """
+        if arg.ident == "":
+            return
         if arg.ident in self.vars:
             raise TwiceDefinedException(arg)
 
@@ -104,6 +106,8 @@ class Scope(Identifiable):
         """
         Add a function to the scope
         """
+        if func.ident == "":
+            return
         if func.ident in self.functions:
             raise TwiceDefinedException(func)
 
@@ -182,7 +186,7 @@ class Scope(Identifiable):
             elif term.number:
                 return "int"
             elif term.string:
-                return "string"
+                return "str"
         elif type(ctx) == MiniCParser.FuncCallExprContext:
             return self.check_function[ctx.ident.text].type
         elif type(ctx) == MiniCParser.ParenExprContext:
@@ -235,7 +239,6 @@ class Function(Scope):
         else:  # Then it is a function declaration
             for arg in ctx.WORD()[2:]:
                 args.append(TypedVar("", str(arg)))
-
         return Function(ctx.ty.text, ctx.ident.text, args)
 
     def from_call_ctx(scope: Scope, ctx: MiniCParser.FunccallContext):

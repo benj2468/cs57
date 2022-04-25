@@ -10,7 +10,7 @@ def parse_term(term: MiniCParser.TermContext):
     if term.number != None:
         return ASTIntLiteralNode(int(term.number.text))
     if term.string != None:
-        return ASTStrLiteralNode(term.string.text)
+        return ASTStrLiteralNode(", ".join([t.getText() for t in term.string.WORD()]))
 
 
 def parse_block(block: MiniCParser.BlockContext):
@@ -23,13 +23,14 @@ def parse_assignment(assgn: MiniCParser.AssignmentContext):
 
 def parse_arg(arg: MiniCParser.ArgContext) -> Tuple[ASTDataType, str]:
     ty: ASTDataType = ASTDataType.VOID_T
-    if arg.ty == "int":
+    argTy = arg.ty.text
+    if argTy == "int":
         ty = ASTDataType.INT_T
-    elif arg.ty == "string":
+    elif argTy == "str":
         ty = ASTDataType.STR_T
-    elif arg.ty == "bool":
+    elif argTy == "bool":
         ty = ASTDataType.BOOL_T
-    elif arg.ty == "float":
+    elif argTy == "float":
         ty = ASTDataType.FLOAT_T
 
     return (ty, arg.ident.getText())
@@ -48,13 +49,13 @@ def parse_expression(expr: MiniCParser.ExprContext):
 
     if type(expr) == MiniCParser.BinOpExprContext:
         op = None
-        if expr.B_OP() == "+":
+        if expr.B_OP().getText() == "+":
             op = ASTBOpType.ADD
-        elif expr.B_OP() == "-":
+        elif expr.B_OP().getText() == "-":
             op = ASTBOpType.SUB
-        elif expr.B_OP() == "*":
+        elif expr.B_OP().getText() == "*":
             op = ASTBOpType.MUL
-        elif expr.B_OP() == "/":
+        elif expr.B_OP().getText() == "/":
             op = ASTBOpType.DIV
         return ASTBExprNode(
             parse_expression(expr.left), parse_expression(expr.right), op
@@ -63,17 +64,17 @@ def parse_expression(expr: MiniCParser.ExprContext):
         return parse_expression(expr.expr())
     if type(expr) == MiniCParser.CompOpExprContext:
         op = None
-        if expr.C_OP() == ">":
+        if expr.C_OP().getText() == ">":
             op = ASTROpType.GT
-        elif expr.C_OP() == "<":
+        elif expr.C_OP().getText() == "<":
             op = ASTROpType.LT
-        elif expr.C_OP() == ">=":
-            op = ASTROpType.GE
-        elif expr.C_OP() == "<=":
-            op = ASTROpType.LE
-        elif expr.C_OP() == "==":
+        elif expr.C_OP().getText() == ">=":
+            op = ASTROpType.GEQ
+        elif expr.C_OP().getText() == "<=":
+            op = ASTROpType.LEQ
+        elif expr.C_OP().getText() == "==":
             op = ASTROpType.EQ
-        elif expr.C_OP() == "!=":
+        elif expr.C_OP().getText() == "!=":
             op = ASTROpType.NE
         return ASTRExprNode(
             parse_expression(expr.left), parse_expression(expr.right), op
@@ -136,7 +137,7 @@ def parse_start(start: MiniCParser.StartContext):
         funcdef = line.funcdef()
         if funcdef:
             function = Function.from_ctx(funcdef)
-            args = [parse_arg(arg) for arg in funcdef.WORD()[2:]]
+            args = [parse_arg(arg) for arg in funcdef.arg()]
             functions.append(
                 ASTFuncDefNode(
                     function.type, function.ident, args, parse_block(funcdef.block())

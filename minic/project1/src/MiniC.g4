@@ -53,7 +53,8 @@ stmt:
 	// A statement can be a return value - semantic analysis will need to check that this is in a function/block
 	| RETURN expr? SEMICOLON # Return
 	// A statement can be a declaration of a variable
-	| arg SEMICOLON # Declare
+	| arg SEMICOLON		# Declare
+	| expr SEMICOLON	# ExprStmt
 	// A stmt can be a while loop
 	| WHILE expr stmt # While
 	// A stmt can be an if block
@@ -61,8 +62,7 @@ stmt:
 	// A stmt can also be an ifelse block
 	| IF expr stmt ELSE stmt # IfElse
 	// A stmt can also just be a normal block (sub-scope, or somponent of if/else)
-	| block	# BlockStmt
-	| expr	# ExprStmt;
+	| block # BlockStmt;
 
 // A block contains a new scope
 block: LBRACKET stmt* RBRACKET;
@@ -75,7 +75,7 @@ arg: ty = WORD ident = variable;
 // A variable is a subcomponent of a many things, and we always want to check it's validity so we extract it here
 variable: ident = WORD;
 // A string is a string literal
-stringlit: DQUOTE literal = WORD DQUOTE;
+stringlit: DQUOTE WORD* DQUOTE;
 
 // Keywords
 EXTERN: 'extern';
@@ -87,8 +87,8 @@ RETURN: 'return';
 // Tokens
 WORD: [a-zA-Z_]+;
 NUMBER: [0-9]+;
-B_OP: [+-/*];
-U_OP: [-];
+B_OP: ('+' | '-' | '/' | '*');
+U_OP: '-';
 C_OP: ('==' | '!=' | '>' | '<' | '>=' | '<=');
 EQUALS: '=';
 

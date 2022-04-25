@@ -5,6 +5,7 @@
 #
 # 19 Apr 2022  bjk  Creation
 # 24 Apr 2022  jpb  Released v1 for class
+# 25 Apr 2022  bjc  Updated to handle multiple parameters to functions
 #
 
 from enum import Enum
@@ -120,7 +121,7 @@ class ASTFuncDefNode(ASTNode):
 
     def print(self, indentation_level: int = 0) -> None:
         print(
-            f"{INDENT_STR * indentation_level}FuncDef. {self.return_type} {self.name}({', '.join([' '.join(x) for x in self.params])})"
+            f"{INDENT_STR * indentation_level}FuncDef. {self.return_type} {self.name}({', '.join([f'{str(x[0])} {x[1]}' for x in self.params])})"
         )
         self.body.print(indentation_level + 1)
 
@@ -312,7 +313,7 @@ class ASTCallNode(ASTExprNode):
 
     def print(self, indentation_level: int = 0) -> None:
         print(
-            f"{INDENT_STR * indentation_level}Call. {self.name}{', parameter =' * (len(self.params))}"
+            f"{INDENT_STR * indentation_level}Call. {self.name}{', parameters =' * (bool(len(self.params)))}"
         )
         for param in self.params:
             param.print(indentation_level + 1)

@@ -17,9 +17,9 @@ minic-java: src/MiniC.g4
 
 test:
 	echo "TESTING"
-	python3 src/main.py examples/ex1.c
-	python3 src/main.py examples/fact.c
-	python3 src/main.py examples/pyramid.c 
+	python3 src/main.py src/examples/ex1.c
+	python3 src/main.py src/examples/fact.c
+	python3 src/main.py src/examples/pyramid.c 
 	echo "TESTING DONE"
 
 pull-workspace:
