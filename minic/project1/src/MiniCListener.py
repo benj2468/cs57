@@ -1,3 +1,6 @@
+from ast import AST
+from typing import List
+from ASTconverter import parse_start
 from dist.MiniCParser import MiniCParser
 from dist.MiniCListener import MiniCListener
 from Scope import Function, Scope, TypedVar
@@ -5,9 +8,9 @@ from Scope import Function, Scope, TypedVar
 
 # This class defines a complete listener for a parse tree produced by MiniCParser.
 class MyMiniCListener(MiniCListener):
-
     def __init__(self):
         self.scope = None
+        self.ast = None
 
     # Enter a parse tree produced by MiniCParser#start.
     def enterStart(self, ctx: MiniCParser.StartContext):
@@ -16,6 +19,7 @@ class MyMiniCListener(MiniCListener):
 
     # Exit a parse tree produced by MiniCParser#start.
     def exitStart(self, ctx: MiniCParser.StartContext):
+        self.ast = parse_start(ctx)
         pass
 
     # Enter a parse tree produced by MiniCParser#line.
@@ -27,23 +31,24 @@ class MyMiniCListener(MiniCListener):
         pass
 
     # Enter a parse tree produced by MiniCParser#funcdec.
-    def enterFuncdec(self, ctx: MiniCParser.FuncdecContext):
+    def enterFunctionDec(self, ctx: MiniCParser.FunctionDecContext):
+        # Scope work for parsing
         function = Function.from_ctx(ctx)
         self.scope.add_function(function)
-        self.scope = function.scope
 
     # Exit a parse tree produced by MiniCParser#funcdec.
-    def exitFuncdec(self, ctx: MiniCParser.FuncdecContext):
+    def exitFunctionDec(self, ctx: MiniCParser.FunctionDecContext):
         pass
 
     # Enter a parse tree produced by MiniCParser#funcdef.
     def enterFuncdef(self, ctx: MiniCParser.FuncdefContext):
         function = Function.from_ctx(ctx)
         self.scope.add_function(function)
-        self.scope = function.scope
+        self.scope = function
 
     # Exit a parse tree produced by MiniCParser#funcdef.
     def exitFuncdef(self, ctx: MiniCParser.FuncdefContext):
+        function = self.scope
         self.scope = self.scope.parent
 
     # Enter a parse tree produced by MiniCParser#TermExpr.
@@ -63,34 +68,57 @@ class MyMiniCListener(MiniCListener):
     def exitFunccall(self, ctx: MiniCParser.FunccallContext):
         pass
 
-    # Enter a parse tree produced by MiniCParser#UnOp.
-    def enterUnOp(self, ctx: MiniCParser.UnOpContext):
+    # Enter a parse tree produced by MiniCParser#TermExpr.
+    def enterTermExpr(self, ctx: MiniCParser.TermExprContext):
         pass
 
-    # Exit a parse tree produced by MiniCParser#UnOp.
-    def exitUnOp(self, ctx: MiniCParser.UnOpContext):
+    # Exit a parse tree produced by MiniCParser#TermExpr.
+    def exitTermExpr(self, ctx: MiniCParser.TermExprContext):
         pass
 
-    # Enter a parse tree produced by MiniCParser#CompOp.
-    def enterCompOp(self, ctx: MiniCParser.CompOpContext):
+    # Enter a parse tree produced by MiniCParser#BinOpExpr.
+    def enterBinOpExpr(self, ctx: MiniCParser.BinOpExprContext):
         pass
 
-    # Exit a parse tree produced by MiniCParser#CompOp.
-    def exitCompOp(self, ctx: MiniCParser.CompOpContext):
+    # Exit a parse tree produced by MiniCParser#BinOpExpr.
+    def exitBinOpExpr(self, ctx: MiniCParser.BinOpExprContext):
         pass
 
-    # Enter a parse tree produced by MiniCParser#BinOp.
-    def enterBinOp(self, ctx: MiniCParser.BinOpContext):
+    # Enter a parse tree produced by MiniCParser#UnOpExor.
+    def enterUnOpExor(self, ctx: MiniCParser.UnOpExprContext):
         pass
 
-    # Exit a parse tree produced by MiniCParser#BinOp.
-    def exitBinOp(self, ctx: MiniCParser.BinOpContext):
+    # Exit a parse tree produced by MiniCParser#UnOpExor.
+    def exitUnOpExor(self, ctx: MiniCParser.UnOpExprContext):
+        pass
+
+    # Enter a parse tree produced by MiniCParser#ParenExpr.
+    def enterParenExpr(self, ctx: MiniCParser.ParenExprContext):
+        pass
+
+    # Exit a parse tree produced by MiniCParser#ParenExpr.
+    def exitParenExpr(self, ctx: MiniCParser.ParenExprContext):
+        pass
+
+    # Enter a parse tree produced by MiniCParser#FuncCallExpr.
+    def enterFuncCallExpr(self, ctx: MiniCParser.FuncCallExprContext):
+        pass
+
+    # Exit a parse tree produced by MiniCParser#FuncCallExpr.
+    def exitFuncCallExpr(self, ctx: MiniCParser.FuncCallExprContext):
+        pass
+
+    # Enter a parse tree produced by MiniCParser#CompOpExor.
+    def enterCompOpExpr(self, ctx: MiniCParser.CompOpExprContext):
+        pass
+
+    # Exit a parse tree produced by MiniCParser#CompOpExor.
+    def exitCompOpExpr(self, ctx: MiniCParser.CompOpExprContext):
         pass
 
     # Enter a parse tree produced by MiniCParser#Variable.
     def enterVariable(self, ctx: MiniCParser.VariableContext):
         self.scope.check_var(ctx.ident.text)
-        pass
 
     # Exit a parse tree produced by MiniCParser#Variable.
     def exitVariable(self, ctx: MiniCParser.VariableContext):
@@ -98,6 +126,7 @@ class MyMiniCListener(MiniCListener):
 
     # Enter a parse tree produced by MiniCParser#Assign.
     def enterAssign(self, ctx: MiniCParser.AssignContext):
+        self.scope.expr = None
         pass
 
     # Exit a parse tree produced by MiniCParser#Assign.
@@ -124,35 +153,12 @@ class MyMiniCListener(MiniCListener):
 
     # Enter a parse tree produced by MiniCParser#While.
     def enterWhile(self, ctx: MiniCParser.WhileContext):
+        self.scope = self.scope.new_while()
         pass
 
     # Exit a parse tree produced by MiniCParser#While.
     def exitWhile(self, ctx: MiniCParser.WhileContext):
-        pass
-
-    # Enter a parse tree produced by MiniCParser#If.
-    def enterIf(self, ctx: MiniCParser.IfContext):
-        pass
-
-    # Exit a parse tree produced by MiniCParser#If.
-    def exitIf(self, ctx: MiniCParser.IfContext):
-        pass
-
-    # Enter a parse tree produced by MiniCParser#IfElse.
-    def enterIfElse(self, ctx: MiniCParser.IfElseContext):
-        pass
-
-    # Exit a parse tree produced by MiniCParser#IfElse.
-    def exitIfElse(self, ctx: MiniCParser.IfElseContext):
-        pass
-
-    # # Enter a parse tree produced by MiniCParser#BlockStmt.
-    # def enterBlockStmt(self, ctx: MiniCParser.BlockStmtContext):
-    #     pass
-
-    # # Exit a parse tree produced by MiniCParser#BlockStmt.
-    # def exitBlockStmt(self, ctx: MiniCParser.BlockStmtContext):
-    #     pass
+        self.scope = self.scope.parent
 
     # Enter a parse tree produced by MiniCParser#block.
     def enterBlock(self, ctx: MiniCParser.BlockContext):
@@ -161,11 +167,3 @@ class MyMiniCListener(MiniCListener):
     # Exit a parse tree produced by MiniCParser#block.
     def exitBlock(self, ctx: MiniCParser.BlockContext):
         self.scope = self.scope.parent
-
-    # Enter a parse tree produced by MiniCParser#arg.
-    def enterArg(self, ctx: MiniCParser.ArgContext):
-        pass
-
-    # Exit a parse tree produced by MiniCParser#arg.
-    def exitArg(self, ctx: MiniCParser.ArgContext):
-        pass

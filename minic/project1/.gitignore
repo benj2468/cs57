@@ -3,3 +3,4 @@
 src/.antlr/*
 src/dist/*
 src/__pycache__
+workspace/**/*
