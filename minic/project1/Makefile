@@ -24,3 +24,6 @@ test:
 
 pull-workspace:
 	scp -r f002q3z@babylon4.thayer.dartmouth.edu:/thayerfs/courses/22spring/cosc057/workspace/Project_1 ./workspace
+
+clean:
+	rm -f *.cpp

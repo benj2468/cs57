@@ -1,4 +1,7 @@
-from AST import *
+from myAST.AST import *
+from myAST.Declarations import *
+from myAST.Statements import *
+from myAST.Expressions import *
 from dist.MiniCParser import MiniCParser
 from Scope import Function, Scope, ScopeType, TypedVar
 
@@ -9,7 +12,7 @@ class MyMiniCParser(MiniCParser):
         super().__init__(*args, **kwargs)
         self.scope: Scope = Scope()
 
-    def parse(self):
+    def parse(self, file_ident: str):
         def parse_term(term: MiniCParser.TermContext):
             if term.ident != None:
                 ident = term.ident.getText()
@@ -179,7 +182,7 @@ class MyMiniCParser(MiniCParser):
                     args = [parse_arg(arg) for arg in funcdef.arg()]
                     functions.append(
                         ASTFuncDefNode(
-                            function.type,
+                            ASTDataType.from_str(function.type),
                             function.ident,
                             args,
                             parse_block(funcdef.block()),
@@ -187,6 +190,6 @@ class MyMiniCParser(MiniCParser):
                     )
                     self.scope = self.scope.parent
 
-            return ASTRootNode(decls, assignments, functions)
+            return ASTRootNode(file_ident, decls, assignments, functions)
 
         return parse_start(self.start())
