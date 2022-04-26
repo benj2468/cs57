@@ -198,10 +198,10 @@ class ASTCallNode(ASTExprNode):
         args = [arg.gen() for arg in self.params]
         return f"""
         ({{
-            Function *CalleeF = TheModule->getFunction({self.name});
+            Function *CalleeF = TheModule->getFunction("{self.name}");
 
-            std::vector<Value> ArgsV{', '.join(args)};
+            std::vector<Value *> ArgsV{{{', '.join(args)}}};
 
-            Builder.CreateCall(CalleeF, ArgsV);
+            Builder->CreateCall(CalleeF, ArgsV);
         }})
         """

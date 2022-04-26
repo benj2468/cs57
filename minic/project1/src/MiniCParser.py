@@ -115,9 +115,14 @@ class MyMiniCParser(MiniCParser):
                 self.scope.add_function(function)
 
                 func = Function.from_ctx(decl)
-                args = [ty.getText() for ty in decl.WORD()[2:]]
+                args = [ASTDataType.from_str(ty.getText()) for ty in decl.WORD()[2:]]
 
-                return ASTFuncDeclNode(bool(decl.EXTERN()), func.type, func.ident, args)
+                return ASTFuncDeclNode(
+                    bool(decl.EXTERN()),
+                    ASTDataType.from_str(func.type),
+                    func.ident,
+                    args,
+                )
             if type(decl) == MiniCParser.VariableDecContext:
 
                 arg = decl.arg()
@@ -159,7 +164,7 @@ class MyMiniCParser(MiniCParser):
                 (ty, name) = parse_arg(arg)
                 return ASTVarDeclStmtNode(ty, name)
             if type(stm) == MiniCParser.IfContext:
-                return ASTIfNode(parse_expression(stm.expr()), parse_stmt(stm.stmt(0)))
+                return ASTIfNode(parse_expression(stm.expr()), parse_stmt(stm.stmt()))
 
             raise Exception("Unknown statement type: " + str(type(stm)))
 

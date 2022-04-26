@@ -49,11 +49,11 @@ class ASTWhileNode(ASTStmtNode):
                 nullptr;
 
             // Convert condition to a bool by comparing non-equal to 0.0.
-            CondV = Builder.CreateFCmpONE(
+            CondV = Builder->CreateFCmpONE(
                 CondV, ConstantFP::get(*TheContext, APFloat(0.0)), "ifcond");
 
             
-            Function *TheFunction = Builder.GetInsertBlock()->getParent();
+            Function *TheFunction = Builder->GetInsertBlock()->getParent();
 
             // Create blocks for the body and for after the loop.
             BasicBlock *BodyBB =
@@ -62,16 +62,16 @@ class ASTWhileNode(ASTStmtNode):
                 BasicBlock::Create(*TheContext, "afterloop", TheFunction);
 
             // Insert the conditional branch into the end of LoopEndBB.
-            Builder.CreateCondBr(CondV, LoopBB, AfterBB);
+            Builder->CreateCondBr(CondV, LoopBB, AfterBB);
 
             // Emit body value.
-            Builder.SetInsertPoint(BodyBB);
+            Builder->SetInsertPoint(BodyBB);
             Value *BodyV = {body};
             if (!BodyV)
                 nullptr;
 
             // Any new code will be inserted in AfterBB.
-            Builder.SetInsertPoint(AfterBB);
+            Builder->SetInsertPoint(AfterBB);
         }})
         
         """
@@ -107,16 +107,16 @@ class ASTIfNode(ASTStmtNode):
         else_body = self.else_body.gen()
 
         return f"""
-        ({{
+        {{
             Value *CondV = {cond};
             if (!CondV)
                 nullptr;
 
             // Convert condition to a bool by comparing non-equal to 0.0.
-            CondV = Builder.CreateFCmpONE(
+            CondV = Builder->CreateFCmpONE(
                 CondV, ConstantFP::get(*TheContext, APFloat(0.0)), "ifcond");
 
-            Function *TheFunction = Builder.GetInsertBlock()->getParent();
+            Function *TheFunction = Builder->GetInsertBlock()->getParent();
 
             // Create blocks for the then and else cases.  Insert the 'then' block at the
             // end of the function.
@@ -125,40 +125,36 @@ class ASTIfNode(ASTStmtNode):
             BasicBlock *ElseBB = BasicBlock::Create(*TheContext, "else");
             BasicBlock *MergeBB = BasicBlock::Create(*TheContext, "ifcont");
 
-            Builder.CreateCondBr(CondV, ThenBB, ElseBB);
+            Builder->CreateCondBr(CondV, ThenBB, ElseBB);
 
             // Emit then value.
-            Builder.SetInsertPoint(ThenBB);
+            Builder->SetInsertPoint(ThenBB);
             Value *ThenV = {if_body};
             if (!ThenV)
                 nullptr;
 
-            Builder.CreateBr(MergeBB);
+            Builder->CreateBr(MergeBB);
             // Codegen of 'Then' can change the current block, update ThenBB for the PHI.
-            ThenBB = Builder.GetInsertBlock();
+            ThenBB = Builder->GetInsertBlock();
 
             // Emit else block.
             TheFunction->getBasicBlockList().push_back(ElseBB);
-            Builder.SetInsertPoint(ElseBB);
+            Builder->SetInsertPoint(ElseBB);
 
             Value *ElseV = {else_body};
             if (!ElseV)
                 nullptr;
 
-            Builder.CreateBr(MergeBB);
+            Builder->CreateBr(MergeBB);
             // codegen of 'Else' can change the current block, update ElseBB for the PHI.
-            ElseBB = Builder.GetInsertBlock();
+            ElseBB = Builder->GetInsertBlock();
 
             // Emit merge block.
             TheFunction->getBasicBlockList().push_back(MergeBB);
-            Builder.SetInsertPoint(MergeBB);
+            Builder->SetInsertPoint(MergeBB);
             PHINode *PN =
-                Builder.CreatePHI(Type::getDoubleTy(*TheContext), 2, "iftmp");
-
-            PN->addIncoming(ThenV, ThenBB);
-            PN->addIncoming(ElseV, ElseBB);
-            PN;
-        }})
+                Builder->CreatePHI(Type::getDoubleTy(*TheContext), 2, "iftmp");
+        }}
         """
 
 

@@ -80,11 +80,13 @@ class ASTBlockNode(ASTStmtNode):
             stmt.print(indentation_level + 1)
 
     def gen(self) -> str:
-        res = "({"
-        for stmt in self.stmt_list:
-            res += stmt.gen() + ";"
-        res += "})"
-        return res
+        return f"""
+        ({{
+            
+            {';'.join(stmt.gen() for stmt in self.stmt_list)};
+            Builder->GetInsertBlock();
+        }})
+        """
 
 
 # Enum's __str__ will spit out its class name by default.
@@ -125,6 +127,18 @@ class ASTDataType(MyEnum):
     FLOAT_T = 2
     BOOL_T = 3
     STR_T = 4
+
+    def __str__(self):
+        if self == ASTDataType.VOID_T:
+            return "void"
+        elif self == ASTDataType.INT_T:
+            return "int"
+        elif self == ASTDataType.FLOAT_T:
+            return "float"
+        elif self == ASTDataType.BOOL_T:
+            return "bool"
+        elif self == ASTDataType.STR_T:
+            return "str"
 
     def gen(self) -> str:
         if self == ASTDataType.VOID_T:
@@ -220,13 +234,14 @@ class ASTFuncDefNode(ASTNode):
 
             // build the function's body
             llvm::Value *BodyValue = {body};
+            llvm::Value *Res = nullptr;
             if (BodyValue) {{
-                TheFunction;
+                Res = TheFunction;
             }} else {{
                 // Error reading body, remove function.
                 TheFunction->eraseFromParent();
-                nullptr;
             }};
+            Res;
         }})
         """
 
@@ -270,12 +285,12 @@ class ASTRootNode(ASTNode):
 
         main = ""
 
-        for decl in self.decls:
-            main += f"{decl.gen()};"
-        for asgns in self.asgns:
-            main += f"{asgns.gen()};"
-        for func in self.funcs:
-            main += f"{func.gen()};"
+        for i, decl in enumerate(self.decls):
+            main += f"llvm::Value *Decl{i} = {decl.gen()};"
+        for i, asgns in enumerate(self.asgns):
+            main += f"llvm::Value *Assgn{i} = {asgns.gen()};"
+        for i, func in enumerate(self.funcs):
+            main += f"llvm::Value *Func{i} = {func.gen()};"
 
         return f"""
 #include "llvm/ADT/APFloat.h"
@@ -308,6 +323,9 @@ class ASTRootNode(ASTNode):
 #include <string>
 #include <utility>
 #include <vector>
+
+
+using namespace llvm;
 
         static std::unique_ptr<llvm::LLVMContext> TheContext;
         static std::unique_ptr<llvm::Module> TheModule;

@@ -7,12 +7,17 @@ from MiniCParser import MyMiniCParser
 def main(argv):
     input_stream = 0
     file_ident = "input_stream"
+    print(",".join(argv))
     if len(argv) <= 1:
         input_stream = StdinStream()
     else:
         file_ident = argv[1]
         input_stream = FileStream(argv[1])
         print(argv[1], " ", end="\n")
+
+    print(",".join(argv))
+
+    codegen = len(argv) > 2 and argv[2] == "-c"
 
     # Tokenize the input
     lexer = MiniCLexer(input_stream)
@@ -28,8 +33,10 @@ def main(argv):
         # Print the tree
         ast.print()
 
-        with open("out.cpp", "w") as f:
-            f.write(ast.gen())
+        if codegen:
+
+            with open(argv[3] or "out.cpp", "w") as f:
+                f.write(ast.gen())
 
     except Exception as e:
         print(e.with_traceback())

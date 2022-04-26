@@ -53,7 +53,7 @@ class ASTFuncDeclNode(ASTDeclNode):
 
     def print(self, indentation_level: int = 0) -> None:
         print(
-            f"{INDENT_STR * indentation_level}FuncDecl. {'extern' * self.is_extern} {self.return_type} {self.name}({', '.join(self.params)})"
+            f"{INDENT_STR * indentation_level}FuncDecl. {'extern' * self.is_extern} {self.return_type} {self.name}({', '.join(map(str, self.params))})"
         )
 
     def gen(self):
@@ -66,11 +66,11 @@ class ASTFuncDeclNode(ASTDeclNode):
         )
         return f"""
         ({{
-            std::vector<Type*> Args({', '.join(types)}');
+            std::vector<Type*> Args{{{', '.join(types) if len(types) > 1 else f"{types[0]},"}}};
 
             FunctionType *FT = FunctionType::get({return_ty}, Args, false);
 
-            Function *F = Function::Create(FT, {linkage}, {self.name}, TheModule.get());
+            Function *F = Function::Create(FT, {linkage}, "{self.name}", TheModule.get());
 
             F;
         }})
