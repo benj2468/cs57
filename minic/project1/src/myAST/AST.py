@@ -56,15 +56,17 @@ class ASTAsgnNode(ASTStmtNode):
     def gen(self) -> str:
         rhs = self.rhs.gen()
         return f"""
-        llvm::Value *Val = {rhs};
-        if (Val) {{
-            // Look up the name.
-            llvm::Value *Variable = NamedValues["{self.lhs}"];
-            if (!Variable)
-                LogErrorV("Unknown variable name");
+        ({{
+            llvm::Value *Val = {rhs};
+            if (Val) {{
+                // Look up the name.
+                llvm::Value *Variable = NamedValues["{self.lhs}"];
+                if (!Variable)
+                    LogErrorV("Unknown variable name");
 
-            Builder->CreateStore(Val, Variable);
-        }}
+                Builder->CreateStore(Val, Variable);
+            }}
+        }})
         """
 
 
