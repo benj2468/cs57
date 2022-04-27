@@ -26,7 +26,7 @@ pull-workspace:
 	scp -r f002q3z@babylon4.thayer.dartmouth.edu:/thayerfs/courses/22spring/cosc057/workspace/Project_1 ./workspace
 
 codegen:
-	python3 src/main.py ${FILE} -c out.cpp
+	python3 src/main.py ${FILE} -c out.cpp --no-emit
 	clang++ -g -O3 out.cpp `llvm-config --cxxflags --ldflags --system-libs --libs core` -o gen
 	./gen
 

@@ -67,7 +67,7 @@ class ASTBoolLiteralNode(ASTExprNode):
 
     def gen(self):
         return f"""
-        llvm::ConstantFP::get(*TheContext, llvm::APFloat({self.value}))
+        llvm::ConstantFP::get(*TheContext, llvm::APInt(1, {self.value}))
         """
 
 
@@ -82,7 +82,7 @@ class ASTStrLiteralNode(ASTExprNode):
 
     def gen(self):
         return f"""
-        llvm::ConstantFP::get(*TheContext, llvm::StringRef({self.value}))
+        llvm::ConstantDataArray::getString(*TheContext, "{self.value}", true)
         """
 
 

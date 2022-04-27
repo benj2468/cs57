@@ -1,3 +1,4 @@
+from MiniCErrorListener import MiniCErrorListener
 from myAST.AST import *
 from myAST.Declarations import *
 from myAST.Statements import *
@@ -11,6 +12,9 @@ class MyMiniCParser(MiniCParser):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.scope: Scope = Scope()
+        self.removeErrorListeners()
+        self.listener = MiniCErrorListener()
+        self.addErrorListener(self.listener)
 
     def parse(self, file_ident: str):
         def parse_term(term: MiniCParser.TermContext):

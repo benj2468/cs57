@@ -149,6 +149,8 @@ class ASTDataType(MyEnum):
             return "llvm::Type::getFloatTy(*TheContext)"
         elif self == ASTDataType.BOOL_T:
             return "llvm::Type::getInt1Ty(*TheContext)"
+        elif self == ASTDataType.STR_T:
+            return "llvm::Type::getInt8PtrTy(*TheContext)"
 
     def from_str(s) -> Self:
         if s == "void":
