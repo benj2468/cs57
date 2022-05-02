@@ -89,7 +89,7 @@ class Scope(Identifiable):
         """
         if arg.ident == "":
             return
-        if arg.ident in self.vars:
+        if self.check_var(arg.ident, throw=False):
             raise TwiceDefinedException(arg)
         if self.ty == ScopeType.LOOP:
             raise Exception("Cannot declare variables within a loop")
@@ -110,14 +110,17 @@ class Scope(Identifiable):
         func.parent = self
         self.functions[func.ident] = func
 
-    def check_var(self, ident: str):
+    def check_var(self, ident: str, throw=True):
         """
         Check if a variable is defined in the scope
         """
         if not ident in self.vars:
             if self.parent:
-                return self.parent.check_var(ident)
-            raise UndefinedIdentifier(ident)
+                return self.parent.check_var(ident, throw)
+            if throw:
+                raise UndefinedIdentifier(ident)
+            else:
+                return None
 
         return self.vars[ident]
 
