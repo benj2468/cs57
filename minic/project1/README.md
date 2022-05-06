@@ -4,11 +4,6 @@
 
 I have implemented MiniC parser and lexer using antlr4 and python3.
 
-# Todo
-
-[ ] Comment [MiniCParse.py](src/MiniCParser.py)
-[ ] Audit [Scope](src/Scope.py) code and minimize & simplify
-
 # Extra Credit
 
 I've implemented the following features in addition to the requirements:
@@ -19,6 +14,15 @@ I've implemented the following features in addition to the requirements:
    3. Assignments
 2. Support of strings, and potential for other primitives
 3. Functions can have multiple parameters
+4. Multiple functions
+
+# Helpful tools
+
+I also added some developer flags to help with development
+
+1. `-c <outfile>` performs code-generation and generates the IR representation of your miniC code!
+2. `-v` verbose will print errors with tracebacks, otherwise will print fancy errors
+3. `--no-emit` will not print the AST
 
 # Student
 

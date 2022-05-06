@@ -55,7 +55,7 @@ def main(argv: List[str]):
             ast.print()
 
         if codegen:
-            with open(argv[3] or "out.cpp", "w") as f:
+            with open(codegen or "out.cpp", "w") as f:
                 f.write(ast.gen())
     except antlr4.RecognitionException:
         print_error("\n".join(parser.listener.getErrors()))
