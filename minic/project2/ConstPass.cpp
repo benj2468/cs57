@@ -1,5 +1,5 @@
 //
-// LLVM Function Pass Template
+// LLVM Function Constant Prop/Folding Pass
 //
 // Parts taken from skeleton Copyright (c) 2015 Adrian Sampson at
 // https://github.com/sampsyo/llvm-pass-skeleton/blob/master/skeleton/Skeleton.cpp
@@ -7,7 +7,6 @@
 //
 // 01 May 2022  jpb   Creation from foundational works shown.
 //
-// Other parts taken from here https://github.com/llvm-mirror/llvm/blob/master/lib/Transforms/Scalar/ConstantProp.cpp
 //
 // 11 May 2022  bjc   Project 2
 //
@@ -125,20 +124,21 @@ namespace
       }
       if (!knownCase)
         return nullptr;
-      return ConstantInt::get(I->getType(), APInt(32, opResult));
+
+      return ConstantInt::get(I->getType(), APInt(I->getType()->getIntegerBitWidth(), opResult));
     }
 
-    void handleInstruction(Instruction *I, const DataLayout &DL, TargetLibraryInfo *TL)
+    Instruction *handleInstruction(Instruction *I)
     {
       if (Constant *C = MyConstantFolder(I))
       {
         errs() << "Replacing Instruction: (" << I << ") With Constant: (" << getInt(C) << ")\n";
+
         I->replaceAllUsesWith(C);
-        for (auto &U : I->uses())
-        {
-          handleInstruction(cast<Instruction>(I), DL, TL);
-        }
+
+        return I;
       }
+      return nullptr;
     };
 
     void getAnalysisUsage(AnalysisUsage &AU) const override
@@ -157,10 +157,19 @@ namespace
       TargetLibraryInfo *TLI =
           &getAnalysis<TargetLibraryInfoWrapperPass>().getTLI(F);
 
+      std::vector<Instruction *> ToDelete;
       for (inst_iterator I = inst_begin(F), E = inst_end(F); I != E; ++I)
       {
-        handleInstruction(&*I, DL, TLI);
+        if (Instruction *R = handleInstruction(&*I))
+        {
+          ToDelete.push_back(R);
+        }
       };
+      for (auto I : ToDelete)
+      {
+        if (I->isSafeToRemove())
+          I->removeFromParent();
+      }
       return false; // returning false means the overall CFG has not changed
     };
   };
