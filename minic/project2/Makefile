@@ -7,14 +7,12 @@ OPT=opt-10
 
 CPROP=ConstProp
 
+$(CPROP)Pass.sh: $(CPROP).so
+	echo $(OPT) -S -load ./$(CPROP).so -constproppass >> $@
+	chmod +x $@
 
-all:	$(CPROP).so
-
-$(CPROP).so:	$(CPROP).o
+$(CPROP).so: $(CPROP).o
 	$(CXX) --shared -o $(CPROP).so ${LDFLAGS} $^
 
-test:	$(CPROP).so
-	$(OPT) -S -load ./$(CPROP).so -constproppass < test/example.ll > /dev/null
-
 clean:
-	$(RM) $(CPROP).o $(CPROP).so
+	$(RM) $(CPROP).o $(CPROP).so $(CPROP)Pass.sh
