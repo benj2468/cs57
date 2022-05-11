@@ -11,15 +11,19 @@
 //
 // 11 May 2022  bjc   Project 2
 //
-
-#include "llvm/Pass.h"
 #include "llvm/ADT/Statistic.h"
+#include "llvm/Pass.h"
+#include "llvm/IR/InstIterator.h"
+#include "llvm/IR/NoFolder.h"
+#include "llvm/IR/Type.h"
 #include "llvm/IR/Function.h"
-#include "llvm/Analysis/ConstantFolding.h"
-#include "llvm/Analysis/TargetLibraryInfo.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/IR/LegacyPassManager.h"
+#include "llvm/IR/InstrTypes.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
+#include "llvm/IR/IRBuilder.h"
+#include "llvm/Transforms/Utils/BasicBlockUtils.h"
+#include "llvm/Analysis/TargetLibraryInfo.h"
 
 using namespace llvm;
 
@@ -36,11 +40,99 @@ namespace
     static char ID;
     ConstPass() : FunctionPass(ID) {}
 
+    int getInt(Value *val)
+    {
+      if (llvm::ConstantInt *CI = dyn_cast<llvm::ConstantInt>(val))
+      {
+        return CI->getSExtValue();
+      }
+      return 0;
+    }
+
+    Constant *MyConstantFolder(Instruction *I)
+    {
+      errs() << "Trying to fold: " << I << "\n";
+      if (!all_of(I->operands(), [](Use &U)
+                  { return isa<Constant>(U); }))
+        return nullptr;
+
+      Constant *Op1;
+      if (I->getNumOperands() > 0)
+        Op1 = dyn_cast<Constant>(I->getOperand(0));
+      Constant *Op2;
+      if (I->getNumOperands() > 1)
+        Op2 = dyn_cast<Constant>(I->getOperand(1));
+
+      int opResult = 0;
+      bool knownCase = false;
+
+      if (const auto *CI = dyn_cast<CmpInst>(I))
+      {
+        knownCase = true;
+        // It is a compare instruction - fold that
+        CmpInst::Predicate Pred = CI->getPredicate();
+        switch (Pred)
+        {
+        case CmpInst::Predicate::ICMP_EQ:
+          opResult = getInt(Op1) == getInt(Op2);
+        case CmpInst::Predicate::ICMP_NE:
+          opResult = getInt(Op1) != getInt(Op2);
+        case CmpInst::Predicate::ICMP_SGE:
+          opResult = getInt(Op1) >= getInt(Op2);
+        case CmpInst::Predicate::ICMP_SGT:
+          opResult = getInt(Op1) > getInt(Op2);
+        case CmpInst::Predicate::ICMP_SLE:
+          opResult = getInt(Op1) <= getInt(Op2);
+        case CmpInst::Predicate::ICMP_SLT:
+          opResult = getInt(Op1) < getInt(Op2);
+        default:
+          knownCase = false;
+        }
+      }
+      else if (const auto *LI = dyn_cast<LoadInst>(I))
+      {
+
+        // It is a load instruction - fold that??
+      }
+      else if (const auto *IVI = dyn_cast<InsertValueInst>(I))
+      {
+        // It is an insert value instruction - fold that??
+      }
+      else if (const auto *EVI = dyn_cast<ExtractValueInst>(I))
+      {
+        // It is an extract value instruction - fold that??
+      }
+      else
+      {
+        knownCase = true;
+        // Handle the opeartions cases
+        unsigned op_code = I->getOpcode();
+        return ConstantExpr::get(op_code, Op1, Op2);
+
+        switch (op_code)
+        {
+        case Instruction::Add:
+          opResult = getInt(Op1) + getInt(Op2);
+        case Instruction::Sub:
+          opResult = getInt(Op1) - getInt(Op2);
+        case Instruction::Mul:
+          opResult = getInt(Op1) * getInt(Op2);
+        case Instruction::FDiv:
+          opResult = getInt(Op1) / getInt(Op2);
+        case Instruction::UnaryOps::FNeg:
+          opResult = -getInt(Op1);
+        }
+      }
+      if (!knownCase)
+        return nullptr;
+      return ConstantInt::get(I->getType(), APInt(32, opResult));
+    }
+
     void handleInstruction(Instruction *I, const DataLayout &DL, TargetLibraryInfo *TL)
     {
-      if (Constant *C = ConstantFoldInstruction(I, DL, TL))
+      if (Constant *C = MyConstantFolder(I))
       {
-        errs() << "Replacing Instruction: (" << I << ") With Constant: (" << C << ")\n";
+        errs() << "Replacing Instruction: (" << I << ") With Constant: (" << getInt(C) << ")\n";
         I->replaceAllUsesWith(C);
         for (auto &U : I->uses())
         {
@@ -65,17 +157,14 @@ namespace
       TargetLibraryInfo *TLI =
           &getAnalysis<TargetLibraryInfoWrapperPass>().getTLI(F);
 
-      for (auto &B : F)
+      for (inst_iterator I = inst_begin(F), E = inst_end(F); I != E; ++I)
       {
-        for (Instruction &I : B)
-        {
-          handleInstruction(&I, DL, TLI);
-        }
-      }
+        handleInstruction(&*I, DL, TLI);
+      };
       return false; // returning false means the overall CFG has not changed
-    }
+    };
   };
-}
+};
 
 // You can change the friendly and long names in RegisterPass to your own pass
 // name.
@@ -90,7 +179,7 @@ static void registerConstPass(const PassManagerBuilder &,
                               legacy::PassManagerBase &PM)
 {
   PM.add(new ConstPass());
-}
+};
 static RegisterStandardPasses
     RegisterMyPass(PassManagerBuilder::EP_EarlyAsPossible,
                    registerConstPass);
