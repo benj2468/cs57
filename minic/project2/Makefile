@@ -1,20 +1,20 @@
 CC=clang-10
 CFLAGS=`llvm-config --cflags` -fPIC
-CXX=clang++
-CXXFLAGS=`llvm-config --cxxflags` -fPIC
-LDFLAGS=`llvm-config --cxxflags --ldflags --libs`
-OPT=opt
+CXX=clang++-10
+CXXFLAGS=`llvm-config-10 --cxxflags` -fPIC
+LDFLAGS=`llvm-config-10 --cxxflags --ldflags --libs`
+OPT=opt-10
 
-CONSTPROPPASS=constprop
+CPROP=ConstProp
 
 
-all:	${CONSTPROPPASS}
+all:	$(CPROP).so
 
-$(CONSTPROPPASS):
-	$(CXX) lib/Transforms/${CONSTPROPPASS}.cpp --shared -o build/$(CONSTPROPPASS).so ${LDFLAGS} 
+$(CPROP).so:	$(CPROP).o
+	$(CXX) --shared -o $(CPROP).so ${LDFLAGS} $^
 
-test:	$(CONSTPROPPASS)
-	$(OPT) -load ./build/$(CONSTPROPPASS).so -constprop < test/example.ll > /dev/null
+test:	$(CPROP).so
+	$(OPT) -S -load ./$(CPROP).so -constproppass < test/example.ll > /dev/null
 
-# clean:
-# 	$(RM) $(TEMPLATENAME).o $(TEMPLATENAME).so
+clean:
+	$(RM) $(CPROP).o $(CPROP).so
