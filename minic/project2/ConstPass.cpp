@@ -31,10 +31,10 @@ using namespace llvm;
 // pass directory (which we will not be doing.)
 namespace
 {
-  struct ConstPropPass : public FunctionPass
+  struct ConstPass : public FunctionPass
   {
     static char ID;
-    ConstPropPass() : FunctionPass(ID) {}
+    ConstPass() : FunctionPass(ID) {}
 
     void handleInstruction(Instruction *I, const DataLayout &DL, TargetLibraryInfo *TL)
     {
@@ -79,18 +79,18 @@ namespace
 
 // You can change the friendly and long names in RegisterPass to your own pass
 // name.
-char ConstPropPass::ID = 0;
-static RegisterPass<ConstPropPass> X("constproppass", "Constant Propagation Pass",
-                                     false,  /* looks at CFG, true changed CFG */
-                                     false); /* analysis pass, true means analysis needs to run again */
+char ConstPass::ID = 0;
+static RegisterPass<ConstPass> X("constpass", "Constant Propagation/Folding Pass",
+                                 false,  /* looks at CFG, true changed CFG */
+                                 false); /* analysis pass, true means analysis needs to run again */
 
 // Automatically enable the pass.
 // http://adriansampson.net/blog/clangpass.html
-static void registerConstPropPass(const PassManagerBuilder &,
-                                  legacy::PassManagerBase &PM)
+static void registerConstPass(const PassManagerBuilder &,
+                              legacy::PassManagerBase &PM)
 {
-  PM.add(new ConstPropPass());
+  PM.add(new ConstPass());
 }
 static RegisterStandardPasses
     RegisterMyPass(PassManagerBuilder::EP_EarlyAsPossible,
-                   registerConstPropPass);
+                   registerConstPass);

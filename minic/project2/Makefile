@@ -5,14 +5,16 @@ CXXFLAGS=`llvm-config-10 --cxxflags` -fPIC
 LDFLAGS=`llvm-config-10 --cxxflags --ldflags --libs`
 OPT=opt-10
 
-CPROP=ConstProp
+CPASS=ConstPass
+CPASSFLAG = $(shell echo $(CPASS) | tr A-Z a-z)
 
-$(CPROP)Pass.sh: $(CPROP).so
-	echo $(OPT) -S -load ./$(CPROP).so -constproppass >> $@
+
+$(CPASS).sh: $(CPASS).so
+	echo $(OPT) -S -load ./$(CPASS).so -$(CPASSFLAG) > $@
 	chmod +x $@
 
-$(CPROP).so: $(CPROP).o
-	$(CXX) --shared -o $(CPROP).so ${LDFLAGS} $^
+$(CPASS).so: $(CPASS).o
+	$(CXX) --shared -o $(CPASS).so ${LDFLAGS} $^
 
 clean:
-	$(RM) $(CPROP).o $(CPROP).so $(CPROP)Pass.sh
+	$(RM) $(CPASS).o $(CPASS).so $(CPASS).sh
