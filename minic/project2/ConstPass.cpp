@@ -27,7 +27,7 @@
 using namespace llvm;
 
 // Change the DEBUG_TYPE define to the friendly name of your pass
-#define DEBUG_TYPE "constprop"
+#define DEBUG_TYPE "constpass"
 
 // Beginning of anonymous namespace. Keeping it anonymous prevents duplicate
 // namespaces from occurring, especially when merging code into the LLVM
@@ -48,13 +48,16 @@ namespace
       return 0;
     }
 
+    /// Custom Constant Folder for any instruction
+    ///
+    /// Returns a Constant if it can be folded, and nullptr otherwise
     Constant *MyConstantFolder(Instruction *I)
     {
-      errs() << "Trying to fold: " << I << "\n";
       if (!all_of(I->operands(), [](Use &U)
                   { return isa<Constant>(U); }))
         return nullptr;
 
+      /// Extract the Constant Operands
       Constant *Op1;
       if (I->getNumOperands() > 0)
         Op1 = dyn_cast<Constant>(I->getOperand(0));
@@ -62,9 +65,11 @@ namespace
       if (I->getNumOperands() > 1)
         Op2 = dyn_cast<Constant>(I->getOperand(1));
 
+      // Values for the result, and for whether it is a known case
       int opResult = 0;
       bool knownCase = false;
 
+      // If we have a Comparison Instruction
       if (const auto *CI = dyn_cast<CmpInst>(I))
       {
         knownCase = true;
@@ -74,23 +79,29 @@ namespace
         {
         case CmpInst::Predicate::ICMP_EQ:
           opResult = getInt(Op1) == getInt(Op2);
+          break;
         case CmpInst::Predicate::ICMP_NE:
           opResult = getInt(Op1) != getInt(Op2);
+          break;
         case CmpInst::Predicate::ICMP_SGE:
           opResult = getInt(Op1) >= getInt(Op2);
+          break;
         case CmpInst::Predicate::ICMP_SGT:
           opResult = getInt(Op1) > getInt(Op2);
+          break;
         case CmpInst::Predicate::ICMP_SLE:
           opResult = getInt(Op1) <= getInt(Op2);
+          break;
         case CmpInst::Predicate::ICMP_SLT:
           opResult = getInt(Op1) < getInt(Op2);
+          break;
         default:
           knownCase = false;
+          break;
         }
       }
       else if (const auto *LI = dyn_cast<LoadInst>(I))
       {
-
         // It is a load instruction - fold that??
       }
       else if (const auto *IVI = dyn_cast<InsertValueInst>(I))
@@ -103,42 +114,55 @@ namespace
       }
       else
       {
+        // If we have another type, some arithmetic operation
         knownCase = true;
         // Handle the opeartions cases
         unsigned op_code = I->getOpcode();
-        return ConstantExpr::get(op_code, Op1, Op2);
 
         switch (op_code)
         {
         case Instruction::Add:
           opResult = getInt(Op1) + getInt(Op2);
+          break;
         case Instruction::Sub:
           opResult = getInt(Op1) - getInt(Op2);
+          break;
         case Instruction::Mul:
           opResult = getInt(Op1) * getInt(Op2);
+          break;
         case Instruction::FDiv:
           opResult = getInt(Op1) / getInt(Op2);
+          break;
         case Instruction::UnaryOps::FNeg:
           opResult = -getInt(Op1);
+          break;
+        default:
+          knownCase = false;
+          break;
         }
       }
+
+      // If we don't know the case, return nullptr
       if (!knownCase)
         return nullptr;
 
+      // Generate the ConstantInt result
       return ConstantInt::get(I->getType(), APInt(I->getType()->getIntegerBitWidth(), opResult));
     }
 
-    Instruction *handleInstruction(Instruction *I)
+    /// Handle a generic instruction
+    ///
+    /// return the instruction if we were able to fold it
+    /// otherwise return nullptr
+    bool handleInstruction(Instruction *I)
     {
       if (Constant *C = MyConstantFolder(I))
       {
-        errs() << "Replacing Instruction: (" << I << ") With Constant: (" << getInt(C) << ")\n";
-
         I->replaceAllUsesWith(C);
 
-        return I;
+        return true;
       }
-      return nullptr;
+      return false;
     };
 
     void getAnalysisUsage(AnalysisUsage &AU) const override
@@ -158,13 +182,27 @@ namespace
           &getAnalysis<TargetLibraryInfoWrapperPass>().getTLI(F);
 
       std::vector<Instruction *> ToDelete;
+      // Iterate over all the instruction
+      std::vector<Instruction *> WorkList;
+      // or better yet, SmallPtrSet<Instruction*, 64> worklist;
+
       for (inst_iterator I = inst_begin(F), E = inst_end(F); I != E; ++I)
+        WorkList.push_back(&*I);
+
+      for (Instruction *I : WorkList)
       {
-        if (Instruction *R = handleInstruction(&*I))
+        // If it's an instruction that we folded, add the instruction to a list of instructions to delete
+        if (handleInstruction(I))
         {
-          ToDelete.push_back(R);
+
+          if (I->isSafeToRemove())
+          {
+            I->print(llvm::errs());
+            ToDelete.push_back(I);
+          }
         }
       };
+      // Delete all the instructions that we flagged
       for (auto I : ToDelete)
       {
         if (I->isSafeToRemove())

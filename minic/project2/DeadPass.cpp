@@ -27,7 +27,7 @@
 using namespace llvm;
 
 // Change the DEBUG_TYPE define to the friendly name of your pass
-#define DEBUG_TYPE "constprop"
+#define DEBUG_TYPE "deadpass"
 
 // Beginning of anonymous namespace. Keeping it anonymous prevents duplicate
 // namespaces from occurring, especially when merging code into the LLVM
@@ -88,7 +88,7 @@ namespace
 // You can change the friendly and long names in RegisterPass to your own pass
 // name.
 char DeadPass::ID = 0;
-static RegisterPass<DeadPass> X("deadPass", "Dead Code Removal Pass",
+static RegisterPass<DeadPass> X("deadpass", "Dead Code Removal Pass",
                                 false,  /* looks at CFG, true changed CFG */
                                 false); /* analysis pass, true means analysis needs to run again */
 
