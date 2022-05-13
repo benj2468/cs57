@@ -43,3 +43,7 @@ Dead code removal is currently being built, but performs the following tasks:
 
 1. will simplify conditional branches that have constant evaluations
 2. will remove basic blocks that have no predecessors
+
+# Testing
+
+To test, simply add a `C` file into the tests/ directory and run `make tests`. It will convert all the files in `/test` to IR, run `mem2reg` on them, then run our `constpass`, and finally run `deadpass`. It should then output them in the tests file to view.

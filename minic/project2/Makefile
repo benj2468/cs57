@@ -26,7 +26,7 @@ $(DPASS).so: $(DPASS).o
 	$(CXX) --shared -o $(DPASS).so ${LDFLAGS} $^
 
 clean:
-	$(RM) $(CPASS).o $(CPASS).so $(DPASS).o $(DPASS).so *.ll $(OTPIMIZE)
+	$(RM) $(CPASS).o $(CPASS).so $(DPASS).o $(DPASS).so *.ll $(OTPIMIZE) tests/*.ll
 
 test:
 	./$(OTPIMIZE) ./tests/*
