@@ -197,7 +197,6 @@ namespace
 
           if (I->isSafeToRemove())
           {
-            I->print(llvm::errs());
             ToDelete.push_back(I);
           }
         }

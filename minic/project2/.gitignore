@@ -1,4 +1,4 @@
-workspace/
-pass_template/
-cee2/
-codegen/
+workspace
+pass_template
+cee2
+codegen

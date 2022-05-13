@@ -45,6 +45,15 @@ namespace
             AU.addRequired<TargetLibraryInfoWrapperPass>();
         }
 
+        bool getBool(Value *val)
+        {
+            if (llvm::ConstantInt *CI = dyn_cast<llvm::ConstantInt>(val))
+            {
+                return CI->getSExtValue();
+            }
+            return 0;
+        }
+
         // The main (and most important) function. This is the entry point for
         // your the work your pass will do. The sample here prints the function
         // name, then the function, then the function broken into basic blocks
@@ -55,30 +64,47 @@ namespace
             TargetLibraryInfo *TLI =
                 &getAnalysis<TargetLibraryInfoWrapperPass>().getTLI(F);
 
-            std::vector<Instruction *> ToDelete;
-            std::vector<Instruction *> ToCheck;
-            for (inst_iterator I = inst_begin(F), E = inst_end(F); I != E; ++I)
-            {
-                ToCheck.push_back(&*I);
-            };
-            while (!ToCheck.empty())
-            {
-                Instruction *Curr = ToCheck.back();
-                ToCheck.pop_back();
+            std::vector<BasicBlock *> Blocks;
 
-                // Not sure if this should be zero uses? What counts as a use
-                if (Curr->hasOneUse())
+            for (BasicBlock &B : F)
+            {
+                Blocks.push_back(&B);
+            }
+            int blockNum = 0;
+            for (BasicBlock *B : Blocks)
+            {
+                // Loop over all the basic blocks
+                // Remove a basic block if it has no instrutions
+                std::vector<Instruction *> Instrs;
+                for (auto &I : *B)
+                    Instrs.push_back(&I);
+
+                bool canRemove = true;
+                for (Instruction *I : Instrs)
                 {
-                    if (Value *Op1 = Curr->getOperand(0))
+                    errs() << *I << "\n";
+                    if (BranchInst *Branch = dyn_cast<BranchInst>(I))
                     {
-                        for (auto L : Op1->users())
+                        if (Branch->isConditional())
                         {
-                            ToCheck.push_back(dyn_cast<Instruction>(L));
+                            if (Constant *Cond = dyn_cast<Constant>(Branch->getCondition()))
+                            {
+                                BranchInst *Updated = BranchInst::Create(Branch->getSuccessor(getBool(Cond)));
+
+                                ReplaceInstWithInst(Branch, Updated);
+                            }
                         }
                     }
-                    if (Curr->isSafeToRemove())
-                        Curr->removeFromParent();
+                    else
+                        canRemove = false;
                 }
+
+                if (B->hasNPredecessors(0) && blockNum > 0)
+                {
+                    B->removeFromParent();
+                }
+
+                blockNum++;
             }
             return false; // returning false means the overall CFG has not changed
         };
