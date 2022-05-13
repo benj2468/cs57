@@ -39,4 +39,7 @@ We calculate a `opResult`, and then store our `opResult` in a `ConstantInt` (sin
 
 ### Extra Credit Dead Code Remove
 
-Dead code removal was even simple, we simply loop over each instruction, if the instruction has only one use (namely the time it is initiated), then we remove it, and we add the uses of it's operands to a `ToCheck` list, this allows us to jump around and recursively remove instructions if we remove certain lines below that render lines above irrelevant! This is a simple queue structure were we add to the back and pop from the front - nothing special.
+Dead code removal is currently being built, but performs the following tasks:
+
+1. will simplify conditional branches that have constant evaluations
+2. will remove basic blocks that have no predecessors

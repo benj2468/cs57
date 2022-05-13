@@ -10,12 +10,14 @@ DPASS=DeadPass
 CPASSFLAG = $(shell echo $(CPASS) | tr A-Z a-z)
 DPASSFLAG = $(shell echo $(DPASS) | tr A-Z a-z)
 
-optimize.sh: $(CPASS).so $(DPASS).so
+OTPIMIZE = optimize.sh
+
+$(OTPIMIZE): $(CPASS).so $(DPASS).so
 	echo "$(CC) -O -S -Xclang -disable-llvm-passes -emit-llvm \$$1 -o ./tmp1.ll" > optimize.sh
 	echo "$(OPT) -S -mem2reg -o ./tmp2.ll < ./tmp1.ll" >> optimize.sh
 	echo "$(OPT) -S -load=./$(CPASS).so --$(CPASSFLAG) -o ./tmp3.ll < ./tmp2.ll" >> optimize.sh
-	echo "$(OPT) -S -load=./$(DPASS).so --$(DPASSFLAG) -o ./final.ll < ./tmp3.ll" >> optimize.sh
-	chmod +x optimize.sh
+	echo "$(OPT) -S -load=./$(DPASS).so --$(DPASSFLAG) -o ./\$$1.out.ll < ./tmp3.ll" >> optimize.sh
+	chmod +x $(OTPIMIZE)
 
 $(CPASS).so: $(CPASS).o
 	$(CXX) --shared -o $(CPASS).so ${LDFLAGS} $^
@@ -24,4 +26,8 @@ $(DPASS).so: $(DPASS).o
 	$(CXX) --shared -o $(DPASS).so ${LDFLAGS} $^
 
 clean:
-	$(RM) $(CPASS).o $(CPASS).so $(DPASS).o $(DPASS).so *.ll optimize.sh
+	$(RM) $(CPASS).o $(CPASS).so $(DPASS).o $(DPASS).so *.ll $(OTPIMIZE)
+
+test:
+	./$(OTPIMIZE) ./tests/*
+	rm ./tmp*.ll

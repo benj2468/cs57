@@ -82,7 +82,6 @@ namespace
                 bool canRemove = true;
                 for (Instruction *I : Instrs)
                 {
-                    errs() << *I << "\n";
                     if (BranchInst *Branch = dyn_cast<BranchInst>(I))
                     {
                         if (Branch->isConditional())
@@ -101,7 +100,7 @@ namespace
 
                 if (B->hasNPredecessors(0) && blockNum > 0)
                 {
-                    B->removeFromParent();
+                    B->eraseFromParent();
                 }
 
                 blockNum++;
