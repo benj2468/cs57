@@ -16,5 +16,5 @@ int main(void)
         b = a + 10;
     }
     b += 1;
-    return f() / a + 1 + 1 + 1 + b;
+    return f() / (a + 1 + 1 + 1 + b);
 }
