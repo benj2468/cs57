@@ -34,24 +34,22 @@ using namespace llvm;
 // pass directory (which we will not be doing.)
 namespace
 {
-  struct ConstPass : public FunctionPass
+  int getInt(Value *val)
   {
-    static char ID;
-    ConstPass() : FunctionPass(ID) {}
-
-    int getInt(Value *val)
+    if (llvm::ConstantInt *CI = dyn_cast<llvm::ConstantInt>(val))
     {
-      if (llvm::ConstantInt *CI = dyn_cast<llvm::ConstantInt>(val))
-      {
-        return CI->getSExtValue();
-      }
-      return 0;
+      return CI->getSExtValue();
     }
+    return 0;
+  }
+
+  struct ConstFuncPass
+  {
 
     /// Custom Constant Folder for any instruction
     ///
     /// Returns a Constant if it can be folded, and nullptr otherwise
-    Constant *MyConstantFolder(Instruction *I)
+    static Constant *MyConstantFolder(Instruction *I)
     {
       if (!all_of(I->operands(), [](Use &U)
                   { return isa<Constant>(U); }))
@@ -163,9 +161,9 @@ namespace
     ///
     /// return the instruction if we were able to fold it
     /// otherwise return nullptr
-    bool handleInstruction(Instruction *I)
+    static bool handleInstruction(Instruction *I)
     {
-      if (Constant *C = MyConstantFolder(I))
+      if (Constant *C = ConstFuncPass::MyConstantFolder(I))
       {
         I->replaceAllUsesWith(C);
 
@@ -174,39 +172,47 @@ namespace
       return false;
     };
 
-    void getAnalysisUsage(AnalysisUsage &AU) const override
-    {
-      AU.setPreservesCFG();
-      AU.addRequired<TargetLibraryInfoWrapperPass>();
-    }
-
     // The main (and most important) function. This is the entry point for
     // your the work your pass will do. The sample here prints the function
     // name, then the function, then the function broken into basic blocks
     // and finally into instructions. All output is to stderr.
-    virtual bool runOnFunction(Function &F) override
+    static Constant *runOnFunction(std::map<Function *, Constant *> ConstantFunctions, Function &F)
     {
-      const llvm::DataLayout &DL = F.getParent()->getDataLayout();
-      TargetLibraryInfo *TLI =
-          &getAnalysis<TargetLibraryInfoWrapperPass>().getTLI(F);
-
       std::vector<Instruction *> ToDelete;
       // Iterate over all the instruction
       std::vector<Instruction *> WorkList;
-      // or better yet, SmallPtrSet<Instruction*, 64> worklist;
+      Constant *Return;
+      int returnStmtCount = 0;
 
       for (inst_iterator I = inst_begin(F), E = inst_end(F); I != E; ++I)
         WorkList.push_back(&*I);
 
       for (Instruction *I : WorkList)
       {
-        // If it's an instruction that we folded, add the instruction to a list of instructions to delete
-        if (handleInstruction(I))
+        if (CallInst *Call = dyn_cast<CallInst>(I))
         {
+          auto Const = ConstantFunctions.find(dyn_cast<Function>(Call->getOperand(0)));
 
+          if (Const != ConstantFunctions.end())
+          {
+            I->replaceAllUsesWith(Const->second);
+          }
+        }
+        // If it's an instruction that we folded, add the instruction to a list of instructions to delete
+        else if (ConstFuncPass::handleInstruction(I))
+        {
           if (I->isSafeToRemove())
           {
             ToDelete.push_back(I);
+          }
+        }
+        else if (isa<ReturnInst>(I))
+        {
+          Value *V = I->getOperand(0);
+          if (isa<Constant>(V))
+          {
+            returnStmtCount++;
+            Return = dyn_cast<Constant>(V);
           }
         }
       };
@@ -216,24 +222,52 @@ namespace
         if (I->isSafeToRemove())
           I->removeFromParent();
       }
-      return false; // returning false means the overall CFG has not changed
+      if (returnStmtCount == 1)
+        return Return;
+      return nullptr; // returning false means the overall CFG has not changed
+    };
+  };
+
+  struct ConstModPass : public ModulePass
+  {
+    static char ID;
+    ConstModPass() : ModulePass(ID) {}
+
+    void getAnalysisUsage(AnalysisUsage &AU) const override
+    {
+      AU.setPreservesCFG();
+      AU.addRequired<TargetLibraryInfoWrapperPass>();
+    }
+
+    virtual bool runOnModule(Module &M) override
+    {
+      std::map<Function *, Constant *> ConstantFunctions;
+      for (Function &F : M)
+      {
+        if (Constant *C = ConstFuncPass::runOnFunction(ConstantFunctions, F))
+        {
+          ConstantFunctions.insert(std::pair<Function *, Constant *>(&F, C));
+        }
+      }
+
+      return false;
     };
   };
 };
 
 // You can change the friendly and long names in RegisterPass to your own pass
 // name.
-char ConstPass::ID = 0;
-static RegisterPass<ConstPass> X("constpass", "Constant Propagation/Folding Pass",
-                                 false,  /* looks at CFG, true changed CFG */
-                                 false); /* analysis pass, true means analysis needs to run again */
+char ConstModPass::ID = 0;
+static RegisterPass<ConstModPass> X("constpass", "Constant Propagation/Folding Pass",
+                                    false,  /* looks at CFG, true changed CFG */
+                                    false); /* analysis pass, true means analysis needs to run again */
 
 // Automatically enable the pass.
 // http://adriansampson.net/blog/clangpass.html
 static void registerConstPass(const PassManagerBuilder &,
                               legacy::PassManagerBase &PM)
 {
-  PM.add(new ConstPass());
+  PM.add(new ConstModPass());
 };
 static RegisterStandardPasses
     RegisterMyPass(PassManagerBuilder::EP_EarlyAsPossible,
