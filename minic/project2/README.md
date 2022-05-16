@@ -46,4 +46,4 @@ Dead code removal is currently being built, but performs the following tasks:
 
 # Testing
 
-To test, simply add a `C` file into the tests/ directory and run `make tests`. It will convert all the files in `/test` to IR, run `mem2reg` on them, then run our `constpass`, and finally run `deadpass`. It should then output them in the tests file to view.
+To test, simply add a `C` file into the tests/ directory, build the optimizer (`make`), and then run the test script: `./test.sh`. It will convert all the files in `/test` to IR, run `mem2reg` on them, then run our `constpass`, and finally run `deadpass`. It should then output them in the tests file to view. If you want to do more constand folding, for example on redundant phi nodes (since you removed some dead code, there might be some more constants that can be folded) go ahead and run it again!
