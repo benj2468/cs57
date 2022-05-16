@@ -112,6 +112,15 @@ namespace
       {
         // It is an extract value instruction - fold that??
       }
+      else if (const auto *PHI = dyn_cast<PHINode>(I))
+      {
+
+        if (Value *Val = PHI->hasConstantValue())
+        {
+          knownCase = true;
+          opResult = getInt(Val);
+        }
+      }
       else
       {
         // If we have another type, some arithmetic operation
