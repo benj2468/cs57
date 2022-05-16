@@ -80,6 +80,7 @@ namespace
                     Instrs.push_back(&I);
 
                 bool canRemove = true;
+
                 for (Instruction *I : Instrs)
                 {
                     if (BranchInst *Branch = dyn_cast<BranchInst>(I))
@@ -100,6 +101,12 @@ namespace
 
                 if (B->hasNPredecessors(0) && blockNum > 0)
                 {
+                    BasicBlock *Suc = B->getSingleSuccessor();
+                    for (auto &P : Suc->phis())
+                    {
+                        P.removeIncomingValue(B);
+                    }
+
                     B->eraseFromParent();
                 }
 
