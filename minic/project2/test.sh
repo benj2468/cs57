@@ -3,7 +3,8 @@ make
 
 for file in ./tests/*.c
 do
+  echo $file
   ./opt-bjc.sh $file
-done
+donew
 
 rm ./tmp*.ll

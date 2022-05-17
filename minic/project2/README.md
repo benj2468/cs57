@@ -8,6 +8,10 @@ Use process here: https://llvm.org/docs/WritingAnLLVMPass.html
 
 Look into Mark/Sweep for Dead Code Removal
 
+# TODO
+- [ ] Remove redundant functions that have no side effects (don't call anything else & constant)
+    - Plan: If single, constant return value, and no other function calls
+
 # Design Brief
 
 > This is a page or less describing your function pass design, the average number of
