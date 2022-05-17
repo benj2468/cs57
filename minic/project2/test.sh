@@ -1,4 +1,5 @@
 #! /bin/sh
+make
 
 for file in ./tests/*.c
 do

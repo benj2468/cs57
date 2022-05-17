@@ -37,12 +37,20 @@ We consider a few different cases, as well as some sub-cases that correspond to 
 
 We calculate a `opResult`, and then store our `opResult` in a `ConstantInt` (since we on'y have to deal with `i32`s)
 
+This has been updated to be a **Module Pass** to enhance folding on the entire module. The pass still performs folding within functions on everything described above, but now also performs the following folding:
+
+1. If a function returns a single value, which is a constant, replace all instances of the value returned from the call instruction with the constant value to potentially fold other values on compile time.
+2. Evaluate constant PHI nodes
+    - This will need to be run AFTER Dead Code removal is run, becuase the dead basic blocks make the PHI nodes redundant.
+
+
 ### Extra Credit Dead Code Remove
 
 Dead code removal is currently being built, but performs the following tasks:
 
 1. will simplify conditional branches that have constant evaluations
 2. will remove basic blocks that have no predecessors
+
 
 # Testing
 
