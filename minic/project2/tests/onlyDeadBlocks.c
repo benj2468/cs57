@@ -3,6 +3,7 @@
 int main()
 {
     int a = 0;
+    int b;
     if (a == 1)
     {
         int b = 10;
@@ -19,6 +20,9 @@ int main()
     {
         int b = 10;
     }
-    int b = 20;
+    else
+    {
+        b = 20;
+    }
     return b;
 }

@@ -5,6 +5,6 @@ for file in ./tests/*.c
 do
   echo $file
   ./opt-bjc.sh $file
-donew
+done
 
 rm ./tmp*.ll

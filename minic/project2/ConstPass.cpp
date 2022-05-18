@@ -43,6 +43,107 @@ namespace
     return 0;
   }
 
+  // Helper struct to manage a constant instruction
+  struct ConstantInstruction
+  {
+    Instruction *I;
+    Constant *Op1;
+    Constant *Op2;
+
+    bool knownCase = true;
+    int opResult = 0;
+
+    ConstantInstruction(Instruction *Inst)
+    {
+      I = Inst;
+      if (I->getNumOperands() > 0)
+        Op1 = dyn_cast<Constant>(I->getOperand(0));
+      if (I->getNumOperands() > 1)
+        Op2 = dyn_cast<Constant>(I->getOperand(1));
+    }
+
+    void handleCmpInst()
+    {
+      CmpInst *CI = dyn_cast<CmpInst>(I);
+
+      CmpInst::Predicate Pred = CI->getPredicate();
+      switch (Pred)
+      {
+      case CmpInst::Predicate::ICMP_EQ:
+        opResult = getInt(Op1) == getInt(Op2);
+        break;
+      case CmpInst::Predicate::ICMP_NE:
+        opResult = getInt(Op1) != getInt(Op2);
+        break;
+      case CmpInst::Predicate::ICMP_SGE:
+        opResult = getInt(Op1) >= getInt(Op2);
+        break;
+      case CmpInst::Predicate::ICMP_SGT:
+        opResult = getInt(Op1) > getInt(Op2);
+        break;
+      case CmpInst::Predicate::ICMP_SLE:
+        opResult = getInt(Op1) <= getInt(Op2);
+        break;
+      case CmpInst::Predicate::ICMP_SLT:
+        opResult = getInt(Op1) < getInt(Op2);
+        break;
+      default:
+        knownCase = false;
+        break;
+      }
+    }
+
+    void handlePhiNode()
+    {
+      PHINode *PHI = dyn_cast<PHINode>(I);
+      if (Value *Val = PHI->hasConstantValue())
+      {
+        knownCase = true;
+        opResult = getInt(Val);
+      }
+    }
+
+    void handleBinaryOp()
+    {
+      knownCase = true;
+      unsigned op_code = I->getOpcode();
+
+      switch (op_code)
+      {
+      case Instruction::Add:
+        opResult = getInt(Op1) + getInt(Op2);
+        break;
+      case Instruction::Sub:
+        opResult = getInt(Op1) - getInt(Op2);
+        break;
+      case Instruction::Mul:
+        opResult = getInt(Op1) * getInt(Op2);
+        break;
+      case Instruction::FDiv:
+        opResult = getInt(Op1) / getInt(Op2);
+        break;
+      case Instruction::UnaryOps::FNeg:
+        opResult = -getInt(Op1);
+        break;
+      default:
+        // If it's not a known case revert the known case
+        knownCase = false;
+        break;
+      }
+    }
+
+    // Build our final constant result
+    Constant *buildFromResult()
+    {
+      // If we don't know the case, return nullptr
+      if (!knownCase)
+        return nullptr;
+
+      // Generate the ConstantInt result
+      return ConstantInt::get(I->getType(), APInt(I->getType()->getIntegerBitWidth(), opResult));
+    }
+  };
+
   struct ConstFuncPass
   {
 
@@ -55,112 +156,30 @@ namespace
                   { return isa<Constant>(U); }))
         return nullptr;
 
-      /// Extract the Constant Operands
-      Constant *Op1;
-      if (I->getNumOperands() > 0)
-        Op1 = dyn_cast<Constant>(I->getOperand(0));
-      Constant *Op2;
-      if (I->getNumOperands() > 1)
-        Op2 = dyn_cast<Constant>(I->getOperand(1));
-
-      // Values for the result, and for whether it is a known case
-      int opResult = 0;
-      bool knownCase = false;
+      ConstantInstruction ConstInst(I);
 
       // If we have a Comparison Instruction
-      if (const auto *CI = dyn_cast<CmpInst>(I))
+      if (isa<CmpInst>(I))
       {
-        knownCase = true;
-        // It is a compare instruction - fold that
-        CmpInst::Predicate Pred = CI->getPredicate();
-        switch (Pred)
-        {
-        case CmpInst::Predicate::ICMP_EQ:
-          opResult = getInt(Op1) == getInt(Op2);
-          break;
-        case CmpInst::Predicate::ICMP_NE:
-          opResult = getInt(Op1) != getInt(Op2);
-          break;
-        case CmpInst::Predicate::ICMP_SGE:
-          opResult = getInt(Op1) >= getInt(Op2);
-          break;
-        case CmpInst::Predicate::ICMP_SGT:
-          opResult = getInt(Op1) > getInt(Op2);
-          break;
-        case CmpInst::Predicate::ICMP_SLE:
-          opResult = getInt(Op1) <= getInt(Op2);
-          break;
-        case CmpInst::Predicate::ICMP_SLT:
-          opResult = getInt(Op1) < getInt(Op2);
-          break;
-        default:
-          knownCase = false;
-          break;
-        }
+        ConstInst.handleCmpInst();
       }
-      else if (const auto *LI = dyn_cast<LoadInst>(I))
+      else if (isa<PHINode>(I))
       {
-        // It is a load instruction - fold that??
-      }
-      else if (const auto *IVI = dyn_cast<InsertValueInst>(I))
-      {
-        // It is an insert value instruction - fold that??
-      }
-      else if (const auto *EVI = dyn_cast<ExtractValueInst>(I))
-      {
-        // It is an extract value instruction - fold that??
-      }
-      else if (const auto *PHI = dyn_cast<PHINode>(I))
-      {
-
-        if (Value *Val = PHI->hasConstantValue())
-        {
-          knownCase = true;
-          opResult = getInt(Val);
-        }
+        ConstInst.handlePhiNode();
       }
       else
       {
-        // If we have another type, some arithmetic operation
-        knownCase = true;
-        // Handle the opeartions cases
-        unsigned op_code = I->getOpcode();
-
-        switch (op_code)
-        {
-        case Instruction::Add:
-          opResult = getInt(Op1) + getInt(Op2);
-          break;
-        case Instruction::Sub:
-          opResult = getInt(Op1) - getInt(Op2);
-          break;
-        case Instruction::Mul:
-          opResult = getInt(Op1) * getInt(Op2);
-          break;
-        case Instruction::FDiv:
-          opResult = getInt(Op1) / getInt(Op2);
-          break;
-        case Instruction::UnaryOps::FNeg:
-          opResult = -getInt(Op1);
-          break;
-        default:
-          knownCase = false;
-          break;
-        }
+        ConstInst.handleBinaryOp();
       }
 
       // If we don't know the case, return nullptr
-      if (!knownCase)
-        return nullptr;
-
-      // Generate the ConstantInt result
-      return ConstantInt::get(I->getType(), APInt(I->getType()->getIntegerBitWidth(), opResult));
+      return ConstInst.buildFromResult();
     }
 
     /// Handle a generic instruction
     ///
-    /// return the instruction if we were able to fold it
-    /// otherwise return nullptr
+    /// return true if we can fold it
+    /// return false if we cannot
     static bool handleInstruction(Instruction *I)
     {
       if (Constant *C = ConstFuncPass::MyConstantFolder(I))
@@ -189,6 +208,7 @@ namespace
 
       for (Instruction *I : WorkList)
       {
+        // Call instructions need to be checked special becuase we know if functions are constant
         if (CallInst *Call = dyn_cast<CallInst>(I))
         {
           auto Const = ConstantFunctions.find(dyn_cast<Function>(Call->getOperand(0)));
@@ -206,6 +226,7 @@ namespace
             ToDelete.push_back(I);
           }
         }
+        // Return instructions also need to be special becuase they might indicate a function is a constnat function
         else if (isa<ReturnInst>(I))
         {
           Value *V = I->getOperand(0);
@@ -222,9 +243,11 @@ namespace
         if (I->isSafeToRemove())
           I->removeFromParent();
       }
+      // If there is a single return stmt, and it is constant, then we have a constant function
       if (returnStmtCount == 1)
         return Return;
-      return nullptr; // returning false means the overall CFG has not changed
+
+      return nullptr;
     };
   };
 
