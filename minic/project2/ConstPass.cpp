@@ -50,7 +50,7 @@ namespace
     Constant *Op1;
     Constant *Op2;
 
-    bool knownCase = true;
+    bool knownCase = false;
     int opResult = 0;
 
     ConstantInstruction(Instruction *Inst)
@@ -241,7 +241,9 @@ namespace
       for (auto I : ToDelete)
       {
         if (I->isSafeToRemove())
+        {
           I->removeFromParent();
+        }
       }
       // If there is a single return stmt, and it is constant, then we have a constant function
       if (returnStmtCount == 1)
