@@ -50,7 +50,7 @@ namespace
     Constant *Op1;
     Constant *Op2;
 
-    bool knownCase = false;
+    bool knownCase = true;
     int opResult = 0;
 
     ConstantInstruction(Instruction *Inst)
@@ -101,6 +101,7 @@ namespace
         knownCase = true;
         opResult = getInt(Val);
       }
+      knownCase = false;
     }
 
     void handleBinaryOp()
