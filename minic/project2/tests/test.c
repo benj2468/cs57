@@ -1,20 +1,13 @@
-int f(void)
+int main(int argc)
 {
-    return 2;
-}
-
-int main(void)
-{
-    int a = 0;
     int b;
-    if (a == 1)
+    if (argc == 0)
     {
-        b = a + 9;
+        b = 100;
     }
     else
     {
-        b = a + 10;
+        b = 200;
     }
-    b += 1;
-    return f() / (a + 1 + 1 + 1 + b);
+    return b;
 }

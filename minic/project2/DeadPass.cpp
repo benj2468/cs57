@@ -95,6 +95,18 @@ namespace
                             }
                         }
                     }
+                    else if (PHINode *PHI = dyn_cast<PHINode>(I))
+                    {
+                        if (PHI->getNumIncomingValues() == 1)
+                        {
+                            Value *V = PHI->getIncomingValue(0);
+                            Instruction *Updated = BinaryOperator::CreateAdd(V, ConstantInt::get(I->getType(), APInt(I->getType()->getIntegerBitWidth(), 0)));
+
+                            ReplaceInstWithInst(I, Updated);
+                        }
+                        else
+                            canRemove = false;
+                    }
                     else
                         canRemove = false;
                 }

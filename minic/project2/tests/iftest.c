@@ -5,15 +5,20 @@ int addsub(int a)
   int b = 4;
   int c, d;
 
-  num = b + 2;
-  c = 4 + 6 + num;
-  d = a + 5;
+  num = b + 2;     // 6
+  c = 4 + 6 + num; // 16
+  d = a + 5;       // 10
   if (d > num)
-    c = c + b;
+    c = c + b; // 16 + 4 = 20
   else
     c = c - b;
 
-  return num + c + d;
+  return num + c + d; // 6 + 20 + 10 = 36
+}
+
+int main()
+{
+  return addsub(5);
 }
 
 // b = 4
