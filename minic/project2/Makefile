@@ -11,6 +11,7 @@ PROJECT := foo
 CPASS=ConstPass
 DPASS=DeadPass
 GPASS=GeneratorPass
+GPASS2=GeneratorPass2
 
 CPASSFLAG = $(shell echo $(CPASS) | tr A-Z a-z)
 DPASSFLAG = $(shell echo $(DPASS) | tr A-Z a-z)
@@ -30,4 +31,4 @@ $(GPASS).so: $(GPASS).o
 	$(CXX) --shared -o $(GPASS).so ${LDFLAGS} $^
 
 clean:
-	$(RM) $(CPASS).o $(CPASS).so $(DPASS).o $(DPASS).so $(GPASS).o $(GPASS).so *.ll tests/*.ll *.c *.o *.s *_f.sh
+	$(RM) $(CPASS).o $(CPASS).so $(DPASS).o $(DPASS).so $(GPASS).o $(GPASS).so $(GPASS2).o $(GPASS2).so *.ll tests/*.ll *.c *.o *.s *_f.sh

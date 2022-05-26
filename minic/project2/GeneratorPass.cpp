@@ -683,23 +683,12 @@ namespace
                 std::cout << "push"
                           << " " << reg << "\n";
             }
-            // Mem.move("%rbp", "%rsp");
 
-            std::vector<std::string> RegsUsed;
             auto AIter = F.arg_begin();
 
             if (AIter != F.arg_end())
             {
                 Mem.updateLocationValue("%rdi", &*AIter);
-            }
-
-            std::map<Value *, std::vector<Value *>> Liveliness;
-
-            for (auto BIter = F.end(); BIter == F.begin(); --BIter)
-            {
-                BasicBlock *B = &*BIter;
-
-                blockLiveliness(B, Liveliness);
             }
 
             for (auto &B : F)

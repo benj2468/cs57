@@ -10,5 +10,5 @@ int looper(int i)
 
 int main()
 {
-    looper(5);
+    return looper(5);
 }
