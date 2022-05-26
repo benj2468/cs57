@@ -150,15 +150,20 @@ namespace
 
         std::string assign(int registers_used)
         {
-            std::string registers[8];
-            registers[0] = "%r8";
-            registers[1] = "%r9";
-            registers[2] = "%r10";
-            registers[3] = "%r11";
-            registers[4] = "%r12";
-            registers[5] = "%r13";
-            registers[6] = "%r14";
-            registers[7] = "%r15";
+            int MAX_REGISTERS = 12;
+            std::string registers[MAX_REGISTERS];
+            registers[0] = "%rax";
+            registers[1] = "%rbx";
+            registers[2] = "%rcx";
+            registers[3] = "%rdx";
+            registers[4] = "%r8";
+            registers[5] = "%r9";
+            registers[6] = "%r10";
+            registers[7] = "%r11";
+            registers[8] = "%r12";
+            registers[9] = "%r13";
+            registers[10] = "%r14";
+            registers[11] = "%r15";
             // This will loop back and assign registers... for now lets just send it all
 
             std::stringstream stream;
@@ -169,9 +174,9 @@ namespace
 
             std::string res = stream.str();
 
-            if (registers_used < 8)
+            if (registers_used <= MAX_REGISTERS)
             {
-                for (int i = 0; i < 8; i++)
+                for (int i = 0; i < MAX_REGISTERS; i++)
                 {
                     res = _replaceAll(res, "%_" + std::to_string(i), registers[i]);
                 }
@@ -452,12 +457,20 @@ namespace
             }
             else if (op == Instruction::SDiv)
             {
+
+                Builder.push("%rax");
                 Builder.push("%rdx");
                 Builder.move("$0", "%rdx");
                 Builder.move(loc0, "%rax");
+
+                std::string _loc1 = Mem.getLocationFor(Op1, true);
+                std::string loc1 = Mem.getLocationFor(Op1);
+                Builder.move(_loc1, loc1);
+
                 Builder.calc("div", loc1);
                 Builder.pop("%rdx");
                 Builder.move("%rax", resLoc);
+                Builder.pop("%rax");
             }
             else if (op == Instruction::Mul)
             {

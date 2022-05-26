@@ -18,7 +18,7 @@ int addsub(int a)
 
 int main()
 {
-  return addsub(5);
+  return addsub(5); // Should be 36
 }
 
 // b = 4

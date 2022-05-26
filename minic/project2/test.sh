@@ -3,8 +3,9 @@ make
 
 for file in ./tests/*.c
 do
-  echo $file
-  ./opt-bjc.sh $file
+  echo "------"
+  echo "Running: " $file
+  ./opt-bjc.sh $file $file
+  $file\_f.sh
+  echo "Output: " $?
 done
-
-rm ./tmp*.ll

@@ -70,7 +70,7 @@ namespace
             {
                 Blocks.push_back(&B);
             }
-            int blockNum = 0;
+
             for (BasicBlock *B : Blocks)
             {
                 // Loop over all the basic blocks
@@ -79,7 +79,8 @@ namespace
                 for (auto &I : *B)
                     Instrs.push_back(&I);
 
-                bool canRemove = true;
+                std::map<Instruction *, Instruction *> Replacements;
+                std::vector<Instruction *> ToRemove;
 
                 for (Instruction *I : Instrs)
                 {
@@ -89,41 +90,35 @@ namespace
                         {
                             if (Constant *Cond = dyn_cast<Constant>(Branch->getCondition()))
                             {
-                                BranchInst *Updated = BranchInst::Create(Branch->getSuccessor(getBool(Cond)));
+                                BranchInst *Updated = BranchInst::Create(Branch->getSuccessor(!getBool(Cond)));
 
-                                ReplaceInstWithInst(Branch, Updated);
+                                for (PHINode &Phi : Branch->getSuccessor(getBool(Cond))->phis())
+                                {
+                                    if (Value *V = Phi.getIncomingValueForBlock(B))
+                                    {
+                                        Phi.removeIncomingValue(B);
+                                        Value *Incoming = Phi.getIncomingValue(0);
+                                        Phi.replaceAllUsesWith(Incoming);
+                                        ToRemove.push_back(&Phi);
+                                    }
+                                }
+
+                                Replacements.insert(std::make_pair(Branch, Updated));
                             }
                         }
                     }
-                    else if (PHINode *PHI = dyn_cast<PHINode>(I))
-                    {
-                        if (PHI->getNumIncomingValues() == 1)
-                        {
-                            Value *V = PHI->getIncomingValue(0);
-                            Instruction *Updated = BinaryOperator::CreateAdd(V, ConstantInt::get(I->getType(), APInt(I->getType()->getIntegerBitWidth(), 0)));
-
-                            ReplaceInstWithInst(I, Updated);
-                        }
-                        else
-                            canRemove = false;
-                    }
-                    else
-                        canRemove = false;
                 }
 
-                if (B->hasNPredecessors(0) && blockNum > 0)
+                for (auto P : Replacements)
                 {
-                    BasicBlock *Suc = B->getSingleSuccessor();
-                    for (auto &P : Suc->phis())
-                    {
-                        P.removeIncomingValue(B);
-                    }
-
-                    B->eraseFromParent();
+                    ReplaceInstWithInst(P.first, P.second);
                 }
-
-                blockNum++;
+                for (auto I : ToRemove)
+                {
+                    I->eraseFromParent();
+                }
             }
+
             return false; // returning false means the overall CFG has not changed
         };
     };

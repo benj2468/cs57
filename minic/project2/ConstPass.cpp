@@ -120,7 +120,7 @@ namespace
       case Instruction::Mul:
         opResult = getInt(Op1) * getInt(Op2);
         break;
-      case Instruction::FDiv:
+      case Instruction::SDiv:
         opResult = getInt(Op1) / getInt(Op2);
         break;
       case Instruction::UnaryOps::FNeg:

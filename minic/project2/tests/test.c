@@ -9,5 +9,5 @@ int main(int argc)
     {
         b = 200;
     }
-    return b;
+    return b; // Should be 100
 }
