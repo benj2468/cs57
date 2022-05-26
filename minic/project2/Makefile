@@ -30,4 +30,4 @@ $(GPASS).so: $(GPASS).o
 	$(CXX) --shared -o $(GPASS).so ${LDFLAGS} $^
 
 clean:
-	$(RM) $(CPASS).o $(CPASS).so $(DPASS).o $(DPASS).so $(GPASS).o $(GPASS).so *.ll $(MY_OPT).sh tests/*.ll foo*
+	$(RM) $(CPASS).o $(CPASS).so $(DPASS).o $(DPASS).so $(GPASS).o $(GPASS).so *.ll tests/*.ll *.c *.o *.s *_f.sh

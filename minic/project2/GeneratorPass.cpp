@@ -32,12 +32,12 @@ using namespace llvm;
 // Change the DEBUG_TYPE define to the friendly name of your pass
 #define DEBUG_TYPE "generatorpass"
 
-int my_stack = 0xf000;
+int placeholder = 0;
 
-#define STATIC_REGISTERS 7
-std::string function_static_registers[STATIC_REGISTERS] = {"%rsp", "%rbp", "%rbx", "%r12", "%r13", "%r14", "%r15"};
+#define STATIC_REGISTERS 5
+std::string function_static_registers[STATIC_REGISTERS] = {"%rbx", "%r12", "%r13", "%r14", "%r15"};
 
-std::string _hexToMemoryLoc(int hex)
+std::string _hexToMemoryLoc(long hex)
 {
     std::stringstream stream;
     stream << "("
@@ -97,7 +97,7 @@ namespace
     struct Memory
     {
         std::vector<MemorySlot> Slots;
-        std::string registers[4];
+        std::string registers[12];
 
         Memory()
         {
@@ -105,24 +105,14 @@ namespace
             registers[1] = "%rbx";
             registers[2] = "%rcx";
             registers[3] = "%rdx";
-            // registers[4] = "%r8";
-            // registers[5] = "%r9";
-            // registers[6] = "%r10";
-            // registers[7] = "%r11";
-            // registers[8] = "%r12";
-            // registers[9] = "%r13";
-            // registers[10] = "%r14";
-            // registers[11] = "%r15";
-        }
-
-        std::string stash(MemorySlot &S)
-        {
-            return S.name;
-        }
-
-        std::string recover(MemorySlot &S)
-        {
-            exit(EXIT_FAILURE);
+            registers[4] = "%r8";
+            registers[5] = "%r9";
+            registers[6] = "%r10";
+            registers[7] = "%r11";
+            registers[8] = "%r12";
+            registers[9] = "%r13";
+            registers[10] = "%r14";
+            registers[11] = "%r15";
         }
 
         // If there is a value in a register, return it
@@ -159,18 +149,18 @@ namespace
             {
                 if (S.value == V)
                 {
-                    if (S.isRegister())
-                        return S.name;
-                    else
-                    {
-                        return recover(S);
-                    }
+                    return S.name;
                 }
                 index++;
             }
 
-            std::cout << "COULD NOT FIND LOCATION OF VALUE";
-            exit(EXIT_FAILURE);
+            // If there is some value we have not seen yet, we should set asside some memory for it, use a placeholder
+
+            MemorySlot S("_" + std::to_string(placeholder), V);
+            Slots.push_back(S);
+            placeholder++;
+
+            return S.name;
         }
 
         // Gets a free register
@@ -186,18 +176,19 @@ namespace
                 }
             }
 
-            int oldestRegister = 0;
-            for (auto S : Slots)
-            {
-                if (S.isRegister())
-                {
-                    // If this value is not going to be used again... then we don't need to do this...
-                    return stash(S);
-                }
-                oldestRegister++;
-            }
-
-            exit(EXIT_FAILURE);
+            // int oldestRegister = 0;
+            // for (auto S : Slots)
+            // {
+            //     if (S.isRegister() && S.name != "%rdi")
+            //     {
+            //         // If this value is not going to be used again... then we don't need to do this...
+            //         std::cout << "Could not "
+            //         exit(EXIT_FAILURE);
+            //     }
+            //     oldestRegister++;
+            // }
+            placeholder++;
+            return "_" + std::to_string(placeholder - 1);
         }
 
         // Move value from one location to another
@@ -208,9 +199,11 @@ namespace
             {
                 return;
             }
+
             std::cout << "mov"
                       << " " << from << ", " << to
                       << "\n";
+
             Value *atFrom = getValueAt(from);
 
             MemorySlot S(to, atFrom);
@@ -248,6 +241,16 @@ namespace
 
         std::string putNew(Value *V)
         {
+            errs() << "Adding a new instruction" << *V << "\n";
+            for (auto S : Slots)
+            {
+                if (S.value == V)
+                {
+
+                    errs() << "This instruction already exists...\n";
+                    return S.name;
+                }
+            }
             std::string loc = getNewLocation();
             MemorySlot S(loc, V);
             Slots.push_back(S);
@@ -365,6 +368,8 @@ namespace
                           << " " << reg << "\n";
             }
 
+            std::cout << "pop %rbp\n";
+
             std::cout << "ret"
                       << "\n";
         }
@@ -386,15 +391,20 @@ namespace
                           << "%rbx"
                           << "\n";
 
+                std::string condCheck = Mem.put(V, true);
+
                 std::cout << "cmp"
                           << " "
                           << "$1"
                           << ", "
-                          << Mem.put(V, true)
+                          << condCheck
                           << "\n";
 
-                std::cout << "je"
-                          << " " << getBlockId(jmpTrue) << "\n";
+                Mem.erase(condCheck);
+
+                std::cout
+                    << "je"
+                    << " " << getBlockId(jmpTrue) << "\n";
                 std::cout << "jmp"
                           << " " << getBlockId(jmpFalse) << "\n";
             }
@@ -424,13 +434,15 @@ namespace
                 Mem.move(Mem.put(*AIter, true), "%rdi");
             }
 
+            std::string resLoc = Mem.putNew(Call);
+
             std::cout << "call"
                       << " ";
             Function *Func = Call->getCalledFunction();
             std::cout << Func->getName().str();
             std::cout << "\n";
 
-            Mem.updateLocationValue("%rax", Call);
+            Mem.move("%rax", resLoc);
         }
 
         void handleCompareInstruction(CmpInst *Cmp)
@@ -521,9 +533,11 @@ namespace
                       << "$" << getBlockId(B0, false) << ", "
                       << "%rbx"
                       << "\n";
+            Mem.erase("%rbx");
 
-            std::cout << "je"
-                      << " " << fromB0Block << "\n";
+            std::cout
+                << "je"
+                << " " << fromB0Block << "\n";
 
             std::string loc = Mem.putNew(PHI);
 
@@ -562,17 +576,19 @@ namespace
             std::string loc0 = Mem.copy(Op0, true);
             std::string loc1 = Mem.put(Op1, true);
 
+            std::string resLoc = Mem.putNew(I);
+
             if (op == Instruction::Add)
             {
                 std::cout << "add"
                           << " " << loc1 << ", " << loc0 << "\n";
-                Mem.updateLocationValue(loc0, I);
+                Mem.move(loc0, resLoc);
             }
             else if (op == Instruction::Sub)
             {
                 std::cout << "sub"
                           << " " << loc1 << ", " << loc0 << "\n";
-                Mem.updateLocationValue(loc0, I);
+                Mem.move(loc0, resLoc);
             }
             else if (op == Instruction::SDiv)
             {
@@ -580,7 +596,7 @@ namespace
                 Mem.move(loc0, "%rax");
                 std::cout << "div"
                           << " " << loc1 << "\n";
-                Mem.updateLocationValue("%rax", I);
+                Mem.move("%rax", resLoc);
             }
             else if (op == Instruction::Mul)
             {
@@ -588,7 +604,7 @@ namespace
                 Mem.move(loc0, "%rax");
                 std::cout << "mul"
                           << " " << loc1 << "\n";
-                Mem.updateLocationValue("%rax", I);
+                Mem.move("%rax", resLoc);
             }
         }
 
@@ -658,6 +674,9 @@ namespace
 
             std::cout << name << ":"
                       << "\n";
+
+            std::cout << "push %rbp\n";
+            std::cout << "mov %rsp, %rbp\n";
 
             for (auto reg : function_static_registers)
             {
