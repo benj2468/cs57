@@ -10,7 +10,7 @@ PROJECT := foo
 
 CPASS=ConstPass
 DPASS=DeadPass
-GPASS2=GeneratorPass2
+GPASS2=GeneratorPass
 
 MY_OPT=opt-bjc
 

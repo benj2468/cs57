@@ -1,15 +1,8 @@
 //
-// LLVM Function Dead Code Elimination Pass
+// LLVM Function Assemply Generator Pass
 //
-// Parts taken from skeleton Copyright (c) 2015 Adrian Sampson at
-// https://github.com/sampsyo/llvm-pass-skeleton/blob/master/skeleton/Skeleton.cpp
-// License file included in directory.
+// 27 May 2022  bjc   Project 3 COSC75
 //
-// 01 May 2022  jpb   Creation from foundational works shown.
-//
-//
-// 11 May 2022  bjc   Project 2
-//#include "llvm/Pass.h"
 #include "llvm/IR/InstIterator.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/LegacyPassManager.h"
@@ -25,7 +18,7 @@
 using namespace llvm;
 
 // Change the DEBUG_TYPE define to the friendly name of your pass
-#define DEBUG_TYPE "generatorpass2"
+#define DEBUG_TYPE "generatorpass"
 
 #define STATIC_REGISTERS 5
 std::string function_static_registers[STATIC_REGISTERS] = {"%rbx", "%r12", "%r13", "%r14", "%r15"};
@@ -661,7 +654,7 @@ namespace
 // You can change the friendly and long names in RegisterPass to your own pass
 // name.
 char GeneratorPass::ID = 0;
-static RegisterPass<GeneratorPass> X("generatorpass2", "Assembly Generator Pass",
+static RegisterPass<GeneratorPass> X("generatorpass", "Assembly Generator Pass",
                                      false,  /* looks at CFG, true changed CFG */
                                      false); /* analysis pass, true means analysis needs to run again */
 

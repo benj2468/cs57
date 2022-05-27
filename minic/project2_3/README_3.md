@@ -28,7 +28,6 @@ My code consists of three major classes.
 Maybe some more...?
 
 
-
 ### Pipeline
 
 ```
@@ -38,7 +37,6 @@ C File --(clang-10)>> IR --(Project 2)>> Optimized IR --(Project 3)>> Assembly -
 ### Testing
 
 Place a c file you wish to test in the `./tests` directory. Then, simply run `./test.sh` and it will load the c files into the pipeline. This will run `make` and loop through each test. It will also build using `gcc` and run to compare exit values!
-
 
 
 # Contributors
