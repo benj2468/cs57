@@ -45,6 +45,11 @@ namespace
     {
         std::vector<std::string> Instructions;
 
+        void debug(std::string str)
+        {
+            Instructions.push_back("# " + str);
+        }
+
         void start()
         {
             Instructions.push_back(".globl _start");
@@ -151,7 +156,7 @@ namespace
 
         std::string assign(int registers_used)
         {
-            int MAX_REGISTERS = 14;
+            int MAX_REGISTERS = 13;
             int TOTAL_REGISTERS = MAX_REGISTERS * 2;
             std::string baseNames[MAX_REGISTERS];
             baseNames[0] = "ax";
@@ -159,15 +164,15 @@ namespace
             baseNames[2] = "cx";
             baseNames[3] = "dx";
             baseNames[4] = "si";
-            baseNames[5] = "di";
-            baseNames[6] = "8";
-            baseNames[7] = "9";
-            baseNames[8] = "10";
-            baseNames[9] = "11";
-            baseNames[10] = "12";
-            baseNames[11] = "13";
-            baseNames[12] = "14";
-            baseNames[13] = "15";
+            // baseNames[5] = "di";
+            baseNames[5] = "8";
+            baseNames[6] = "9";
+            baseNames[7] = "10";
+            baseNames[8] = "11";
+            baseNames[9] = "12";
+            baseNames[10] = "13";
+            baseNames[11] = "14";
+            baseNames[12] = "15";
 
             std::string registers[TOTAL_REGISTERS];
 
@@ -185,8 +190,6 @@ namespace
                 }
             }
 
-            // This will loop back and assign registers... for now lets just send it all
-
             std::stringstream stream;
             for (auto I : Instructions)
             {
@@ -196,7 +199,7 @@ namespace
 
             if (registers_used <= TOTAL_REGISTERS)
             {
-                for (int i = 0; i < TOTAL_REGISTERS; i++)
+                for (int i = registers_used - 1; i >= 0; i--)
                 {
                     res = _replaceAll(res, "%_" + std::to_string(i), registers[i]);
                 }
@@ -206,51 +209,6 @@ namespace
 
             errs() << "[NOT ENOUGH REGISTERS] Unable to deal with complicated memory requirements....\n";
             exit(EXIT_FAILURE);
-            // std::vector<std::vector<std::string>>
-            //     Liveliness;
-
-            // std::regex tagRegex("\\w+\\s(\\%_\\d+)(,\\s(%_\\d+))?");
-
-            // std::vector<std::string> Current;
-
-            // for (auto iter = Instructions.rbegin(); iter != Instructions.rend(); ++iter)
-            // {
-            //     std::string line = *iter;
-            //     std::smatch matches;
-
-            //     // I think we shouldn't se searching on this line, becuase this isn't necessarily the order of execution...
-            //     if (std::regex_search(line, matches, tagRegex))
-            //     {
-            //         std::string used = matches[1];
-            //         std::string changed = matches[3];
-
-            //         // If used not in Current, add it
-            //         bool used_exists = false;
-
-            //         int i = 0;
-            //         std::vector<std::string> Next;
-            //         for (auto C : Current)
-            //         {
-            //             if (C == used)
-            //                 used_exists = true;
-            //             if (C == changed)
-            //                 continue;
-            //             Next.push_back(C);
-            //             errs() << C << ", ";
-            //             i++;
-            //         }
-
-            //         if (!used_exists)
-            //         {
-            //             Next.push_back(used);
-            //             errs() << used << ", ";
-            //         }
-
-            //         Current = Next;
-            //         errs() << "\n";
-            //         Liveliness.push_back(Current);
-            //     }
-            // }
         }
     };
 
@@ -259,6 +217,18 @@ namespace
         // There needs to be some data structure here that maps values to locations
         std::map<Value *, std::string> DS;
         int temporary = 0;
+        int registers_used = 0;
+
+        void startNewFunction()
+        {
+            registers_used = std::max(temporary, registers_used);
+            temporary = 0;
+        }
+
+        int getRegistersUsed()
+        {
+            return std::max(temporary, registers_used);
+        }
 
         std::string getNewLocation()
         {
@@ -359,17 +329,16 @@ namespace
             {
                 Value *V = Branch->getCondition();
 
-                jmpTrue = Branch->getSuccessor(1);
-                BasicBlock *jmpFalse = Branch->getSuccessor(0);
+                jmpTrue = Branch->getSuccessor(0);
+                BasicBlock *jmpFalse = Branch->getSuccessor(1);
 
                 // Indicate which block we are coming from put into %rbx
                 Builder.push("%rbx");
 
-                Builder.move("$" + getBlockId(dyn_cast<BasicBlock>(Branch->getParent()), false), "%rbx");
-
                 std::string condCheck = Mem.getLocationFor(V, true);
 
                 Builder.cmp("$1", condCheck);
+                Builder.move("$" + getBlockId(dyn_cast<BasicBlock>(Branch->getParent()), false), "%rbx");
 
                 Mem.remove(condCheck);
 
@@ -390,6 +359,13 @@ namespace
         {
             Builder.push("%rdi");
 
+            int prior_temp = Mem.temporary;
+
+            for (int i = 0; i < prior_temp; i++)
+            {
+                Builder.push("%_" + std::to_string(i));
+            }
+
             auto AIter = Call->arg_begin();
             if (AIter != Call->arg_end())
             {
@@ -402,6 +378,11 @@ namespace
             Builder.call(Call->getCalledFunction());
             Builder.move("%rax", resLoc);
 
+            for (int i = prior_temp - 1; i >= 0; i--)
+            {
+                Builder.pop("%_" + std::to_string(i));
+            }
+
             Builder.pop("%rdi");
         }
 
@@ -410,7 +391,7 @@ namespace
             // Load value into register
             if (Value *Res = Ret->getOperand(0))
             {
-                std::string loc = Mem.getLocationFor(Res);
+                std::string loc = Mem.getLocationFor(Res, true);
                 Builder.move(loc, "%rax");
             }
 
@@ -429,8 +410,11 @@ namespace
             Value *Op0 = Cmp->getOperand(0);
             Value *Op1 = Cmp->getOperand(1);
 
-            std::string loc0 = Mem.getLocationFor(Op0, true);
-            std::string loc1 = Mem.getLocationFor(Op1);
+            std::string _loc0 = Mem.getLocationFor(Op0, true);
+            std::string loc0 = Mem.getLocationFor(Op0);
+            Builder.move(_loc0, loc0);
+
+            std::string loc1 = Mem.getLocationFor(Op1, true);
 
             std::string trueBlock = addBlockPrefix(std::to_string(nextBlock));
             std::string falseBlock = addBlockPrefix(std::to_string(nextBlock + 1));
@@ -438,7 +422,7 @@ namespace
 
             nextBlock += 3;
 
-            Builder.cmp(loc0, loc1);
+            Builder.cmp(loc1, loc0);
 
             CmpInst::Predicate op = Cmp->getPredicate();
 
@@ -460,42 +444,39 @@ namespace
         {
 
             // We should have the block that we arrived from in %rbx
-            BasicBlock *B0 = PHI->getIncomingBlock(0);
-            BasicBlock *B1 = PHI->getIncomingBlock(1);
-
-            std::string fromB0Block = addBlockPrefix(std::to_string(nextBlock));
-            std::string fromB1Block = addBlockPrefix(std::to_string(nextBlock + 1));
-            std::string postPhi = addBlockPrefix(std::to_string(nextBlock + 2));
-
-            Builder.cmp("$" + getBlockId(B0, false), "%rbx");
-
-            Builder.pop("%rbx");
-
-            Builder.jxx(CmpInst::ICMP_EQ, fromB0Block);
-
+            int incoming_blocks = PHI->getNumIncomingValues();
             std::string loc = Mem.getLocationFor(PHI);
+            std::string postPhi = addBlockPrefix(std::to_string(nextBlock + incoming_blocks));
 
-            if (B1)
+            std::map<int, std::string> blockMappings;
+            for (int incoming = 0; incoming < incoming_blocks; incoming++)
             {
-                Builder.label(fromB1Block);
+                std::string from_block = addBlockPrefix(std::to_string(nextBlock + incoming));
+                blockMappings.insert(std::make_pair(incoming, from_block));
+            }
+            nextBlock += (incoming_blocks + 1);
+            for (auto P : blockMappings)
+            {
+                BasicBlock *B = PHI->getIncomingBlock(P.first);
+                Builder.cmp("$" + getBlockId(B, false), "%rbx");
+                Builder.jxx(CmpInst::ICMP_EQ, P.second);
+            }
 
-                auto placement = Mem.getLocationFor(PHI->getIncomingValue(1), true);
+            for (auto P : blockMappings)
+            {
+                Builder.label(P.second);
+                Builder.pop("%rbx");
+                auto placement = Mem.getLocationFor(PHI->getIncomingValue(P.first), true);
 
                 Builder.move(placement, loc);
                 Builder.jmp(postPhi);
             }
 
-            auto placement = Mem.getLocationFor(PHI->getIncomingValue(0), true);
-            Builder.label(fromB0Block);
-
-            Builder.move(placement, loc);
-
             Builder.label(postPhi);
-
-            nextBlock += 3;
         }
 
-        void handleRemainingInstruction(Instruction *I)
+        void
+        handleRemainingInstruction(Instruction *I)
         {
             int op = I->getOpcode();
 
@@ -555,6 +536,7 @@ namespace
 
         void processBlock(BasicBlock &B)
         {
+
             Builder.label(getBlockId(&B));
 
             BasicBlock::iterator Iter = B.begin();
@@ -612,12 +594,12 @@ namespace
             Builder.label(name);
             Builder.push("%rbp");
             Builder.move("%rsp", "%rbp");
-            Builder.push("%rbx");
 
             for (auto reg : function_static_registers)
             {
                 Builder.push(reg);
             }
+            Builder.push("%rbx");
 
             auto AIter = F.arg_begin();
 
@@ -625,6 +607,8 @@ namespace
             {
                 Mem.setLocation(&*AIter, "%rdi");
             }
+
+            Mem.startNewFunction();
 
             for (auto &B : F)
             {
@@ -645,7 +629,7 @@ namespace
 
         void generate()
         {
-            std::cout << Builder.assign(Mem.temporary);
+            std::cout << Builder.assign(Mem.getRegistersUsed());
         }
     };
 

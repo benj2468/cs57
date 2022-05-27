@@ -1,4 +1,4 @@
-int main(int argc)
+int foo(int argc)
 {
     int b;
     if (argc == 0)
@@ -10,4 +10,9 @@ int main(int argc)
         b = 200;
     }
     return b; // Should be 100
+}
+
+int main()
+{
+    return foo(0);
 }

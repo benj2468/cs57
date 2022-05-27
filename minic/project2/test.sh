@@ -7,5 +7,8 @@ do
   echo "Running: " $file
   ./opt-bjc.sh $file $file
   $file\_f.sh
-  echo "Output: " $?
+  echo "Recieved Output: " $?
+  gcc $file -o $file.sh
+  $file.sh
+  echo "Expected Output: " $?
 done
