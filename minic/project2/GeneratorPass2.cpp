@@ -20,6 +20,7 @@
 #include <iostream>
 #include <sstream>
 #include <algorithm>
+#include <regex>
 
 using namespace llvm;
 
@@ -150,20 +151,40 @@ namespace
 
         std::string assign(int registers_used)
         {
-            int MAX_REGISTERS = 12;
-            std::string registers[MAX_REGISTERS];
-            registers[0] = "%rax";
-            registers[1] = "%rbx";
-            registers[2] = "%rcx";
-            registers[3] = "%rdx";
-            registers[4] = "%r8";
-            registers[5] = "%r9";
-            registers[6] = "%r10";
-            registers[7] = "%r11";
-            registers[8] = "%r12";
-            registers[9] = "%r13";
-            registers[10] = "%r14";
-            registers[11] = "%r15";
+            int MAX_REGISTERS = 14;
+            int TOTAL_REGISTERS = MAX_REGISTERS * 2;
+            std::string baseNames[MAX_REGISTERS];
+            baseNames[0] = "ax";
+            baseNames[1] = "bx";
+            baseNames[2] = "cx";
+            baseNames[3] = "dx";
+            baseNames[4] = "si";
+            baseNames[5] = "di";
+            baseNames[6] = "8";
+            baseNames[7] = "9";
+            baseNames[8] = "10";
+            baseNames[9] = "11";
+            baseNames[10] = "12";
+            baseNames[11] = "13";
+            baseNames[12] = "14";
+            baseNames[13] = "15";
+
+            std::string registers[TOTAL_REGISTERS];
+
+            for (int i = 0; i < MAX_REGISTERS; i++)
+            {
+                if (i <= 5)
+                {
+                    registers[i] = "%r" + baseNames[i];
+                    registers[MAX_REGISTERS + i] = "\%e" + baseNames[i];
+                }
+                else
+                {
+                    registers[i] = "%r" + baseNames[i];
+                    registers[MAX_REGISTERS + i] = "\%r" + baseNames[i] + "d";
+                }
+            }
+
             // This will loop back and assign registers... for now lets just send it all
 
             std::stringstream stream;
@@ -171,18 +192,65 @@ namespace
             {
                 stream << I << "\n";
             }
-
             std::string res = stream.str();
 
-            if (registers_used <= MAX_REGISTERS)
+            if (registers_used <= TOTAL_REGISTERS)
             {
-                for (int i = 0; i < MAX_REGISTERS; i++)
+                for (int i = 0; i < TOTAL_REGISTERS; i++)
                 {
                     res = _replaceAll(res, "%_" + std::to_string(i), registers[i]);
                 }
+
+                return res;
             }
 
-            return res;
+            errs() << "[NOT ENOUGH REGISTERS] Unable to deal with complicated memory requirements....\n";
+            exit(EXIT_FAILURE);
+            // std::vector<std::vector<std::string>>
+            //     Liveliness;
+
+            // std::regex tagRegex("\\w+\\s(\\%_\\d+)(,\\s(%_\\d+))?");
+
+            // std::vector<std::string> Current;
+
+            // for (auto iter = Instructions.rbegin(); iter != Instructions.rend(); ++iter)
+            // {
+            //     std::string line = *iter;
+            //     std::smatch matches;
+
+            //     // I think we shouldn't se searching on this line, becuase this isn't necessarily the order of execution...
+            //     if (std::regex_search(line, matches, tagRegex))
+            //     {
+            //         std::string used = matches[1];
+            //         std::string changed = matches[3];
+
+            //         // If used not in Current, add it
+            //         bool used_exists = false;
+
+            //         int i = 0;
+            //         std::vector<std::string> Next;
+            //         for (auto C : Current)
+            //         {
+            //             if (C == used)
+            //                 used_exists = true;
+            //             if (C == changed)
+            //                 continue;
+            //             Next.push_back(C);
+            //             errs() << C << ", ";
+            //             i++;
+            //         }
+
+            //         if (!used_exists)
+            //         {
+            //             Next.push_back(used);
+            //             errs() << used << ", ";
+            //         }
+
+            //         Current = Next;
+            //         errs() << "\n";
+            //         Liveliness.push_back(Current);
+            //     }
+            // }
         }
     };
 
