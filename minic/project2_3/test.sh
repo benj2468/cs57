@@ -12,3 +12,6 @@ do
   $file.sh
   echo "Expected Output: " $?
 done
+
+
+rm *.ll

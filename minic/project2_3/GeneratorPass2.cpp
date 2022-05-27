@@ -325,6 +325,7 @@ namespace
         void handleBranchInstruction(BranchInst *Branch)
         {
             BasicBlock *jmpTrue = Branch->getSuccessor(0);
+            std::string blockId = getBlockId(dyn_cast<BasicBlock>(Branch->getParent()), false);
             if (Branch->isConditional())
             {
                 Value *V = Branch->getCondition();
@@ -338,7 +339,7 @@ namespace
                 std::string condCheck = Mem.getLocationFor(V, true);
 
                 Builder.cmp("$1", condCheck);
-                Builder.move("$" + getBlockId(dyn_cast<BasicBlock>(Branch->getParent()), false), "%rbx");
+                Builder.move("$" + blockId, "%rbx");
 
                 Mem.remove(condCheck);
 
@@ -350,7 +351,7 @@ namespace
 
                 // Indicate which block we are coming from...
                 Builder.push("%rbx");
-                Builder.move("$" + getBlockId(dyn_cast<BasicBlock>(Branch->getParent()), false), "%rbx");
+                Builder.move("$" + blockId, "%rbx");
                 Builder.jmp(getBlockId(jmpTrue));
             }
         }
