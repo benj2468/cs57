@@ -34,18 +34,17 @@ bool contains(std::set<K> const &set, K const &key)
     return set.find(key) != set.end();
 }
 
-#define MAX_REGISTERS 11
-std::string registers[MAX_REGISTERS] = {"%rax",
-                                        "%rcx",
-                                        "%rsi",
-                                        "%r8",
-                                        "%r9",
-                                        "%r10",
-                                        "%r11",
-                                        "%r12",
-                                        "%r13",
-                                        "%r14",
-                                        "%r15"};
+#define MAX_REGISTERS 9
+std::string registers[MAX_REGISTERS] = {
+    "%rax",
+    "%rcx",
+    "%rsi",
+    "%r10",
+    "%r11",
+    "%r12",
+    "%r13",
+    "%r14",
+    "%r15"};
 
 namespace helpers
 {
@@ -162,9 +161,28 @@ namespace
 
         void move(std::string from, std::string to)
         {
+
+            std::string trueFrom = from;
+            std::string trueTo = to;
+            if (from[0] == '-')
+            {
+                trueFrom = "(%r8)";
+                move("%rbp", "%r8");
+                calc("sub", "$" + std::to_string(-stoi(from)), "%r8", "%r8");
+            }
+            if (to[0] == '-')
+            {
+                trueTo = "%r9";
+            }
             if (from != to)
             {
-                Instructions.push_back("mov " + from + ", " + to);
+                Instructions.push_back("mov " + trueFrom + ", " + trueTo);
+            }
+            if (to[0] == '-')
+            {
+                move("%rbp", "%r8");
+                calc("sub", "$" + std::to_string(-stoi(to)), "%r8", "%r8");
+                move("%r9", "(%r8)");
             }
         }
         void cmp(std::string a, std::string b)
@@ -230,13 +248,49 @@ namespace
             Instructions.push_back(label + ":");
         }
 
-        void calc(std::string op, std::string locA, std::string locB)
+        void calc(std::string op, std::string from, std::string to, std::string dest)
         {
-            Instructions.push_back(op + " " + locA + ", " + locB);
+            std::string trueFrom = from;
+            std::string trueTo = to;
+            if (from[0] == '-')
+            {
+                trueFrom = "%r8";
+                move("%rbp", "%r8");
+                calc("sub", "$" + std::to_string(-stoi(from)), "%r8", "%r8");
+                move("(%r8)", "%r8");
+            }
+            if (to[0] == '-')
+            {
+                trueTo = "%r9";
+                move("%rbp", "%r9");
+                calc("sub", "$" + std::to_string(-stoi(to)), "%r9", "%r9");
+                move("(%r9)", "%r9");
+            }
+
+            Instructions.push_back(op + " " + trueFrom + ", " + trueTo);
+
+            if (to[0] == '-')
+            {
+                move("%rbp", "%r8");
+                calc("sub", "$" + std::to_string(-stoi(to)), "%r8", "%r8");
+                move("%r9", dest);
+            }
+            else
+            {
+                move(to, dest);
+            }
         }
-        void calc(std::string op, std::string locA)
+        void calc(std::string op, std::string to)
         {
-            Instructions.push_back(op + " " + locA);
+            std::string trueTo = to;
+            if (to[0] == '-')
+            {
+                trueTo = "%r8";
+                move("%rbp", "%r8");
+                calc("sub", "$" + std::to_string(-stoi(to)), "%r8", "%r8");
+                move("(%r8)", "%r8");
+            }
+            Instructions.push_back(op + " " + trueTo);
         }
 
         std::string _replaceAll(std::string str, const std::string &from, const std::string &to)
@@ -252,7 +306,7 @@ namespace
 
         std::string assign(int registers_used)
         {
-            // assert(registers_used <= MAX_REGISTERS);
+            assert(registers_used <= MAX_REGISTERS);
 
             std::stringstream stream;
             for (auto I : Instructions)
@@ -261,17 +315,28 @@ namespace
             }
             std::string res = stream.str();
 
-            for (int i = registers_used - 1; i >= 0; i--)
+            for (int i = registers_used; i >= 0; i--)
             {
-                res = _replaceAll(res, "%_" + std::to_string(i), registers[i]);
+                res = _replaceAll(res, "(" + std::to_string(i) + ")", registers[i]);
             }
 
             return res;
         }
     };
 
-    struct Memory
+    struct Generator
     {
+        X86Builder Builder;
+        std::map<BasicBlock *, int> Blocks;
+        int nextBlock = 0;
+        std::map<Value *, Use *> NoMoreUses;
+
+        /*
+
+        Stuff For memory managment
+
+        */
+
         // There needs to be some data structure here that maps values to locations
         std::map<Value *, std::string> DS;
         int registers_used = 0;
@@ -279,15 +344,13 @@ namespace
         BasicBlock *CurrentBlock;
         int stack_offset = 0;
 
-        X86Builder *Builder;
-
         void push()
         {
-            stack_offset -= 1;
+            stack_offset -= 8;
         }
         void pop()
         {
-            stack_offset += 1;
+            stack_offset += 8;
         }
 
         void
@@ -334,14 +397,17 @@ namespace
             if (next == temporary)
                 temporary++;
 
-            registers_used = std::max(registers_used, next);
-
-            if (next > MAX_REGISTERS)
+            if (next >= MAX_REGISTERS)
             {
+                // There are no more registers, so we need to allocate space for this value on the stack...
+                push();
+                return std::to_string(stack_offset - 8);
+
                 errs()
                     << "UNABLE TO SUPPORT MORE THAN " << MAX_REGISTERS << " REGISTERS AT THE CURRENT MOMENT\n";
                 exit(EXIT_FAILURE);
             }
+            registers_used = std::max(registers_used, next);
 
             return std::to_string(next);
         }
@@ -360,27 +426,35 @@ namespace
             {
                 if (P.first == V)
                 {
-                    if (!helpers::has_reachable_uses(CurrentBlock->begin(), V))
-                    {
-                        DS.erase(V);
-                    }
-
+                    Builder.debug("Found... " + P.second);
                     if (P.second[0] == '%')
                     {
                         return P.second;
                     }
+                    else if (P.second[0] == '-')
+                    {
+                        return P.second;
+                    }
+                    Builder.debug("Before: In function " + P.second);
+                    Builder.debug("Before: In function " + P.second);
 
-                    return "%_" + P.second;
+                    return "(" + P.second + ")";
                 }
             }
 
-            auto loc = getNewLocation();
+            std::string loc = getNewLocation();
 
-            auto P = std::make_pair(V, loc);
-            DS.insert(P);
+            DS.insert(std::make_pair(V, loc));
 
-            return "%_" +
-                   P.second;
+            if (loc[0] == '-')
+            {
+                // We have a value that is on the stack...
+                return loc;
+            }
+            else
+            {
+                return "(" + loc + ")";
+            }
         }
         void setLocation(Value *V, std::string loc)
         {
@@ -408,20 +482,17 @@ namespace
                 }
             }
         }
-    };
 
-    struct Generator
-    {
-        X86Builder Builder;
-        Memory Mem;
-        std::map<BasicBlock *, int> Blocks;
-        int nextBlock = 0;
-        std::map<Value *, Use *> NoMoreUses;
+        /*
+
+        End of Memory Stuff
+
+
+        */
 
     public:
         Generator()
         {
-            Mem.Builder = &Builder;
         }
 
         std::string getBlockId(BasicBlock *B, bool with_prefix = true)
@@ -455,12 +526,12 @@ namespace
                 jmpTrue = Branch->getSuccessor(0);
                 BasicBlock *jmpFalse = Branch->getSuccessor(1);
 
-                std::string condCheck = Mem.getLocationFor(V, true);
+                std::string condCheck = getLocationFor(V, true);
 
                 Builder.cmp("$1", condCheck);
                 Builder.move("$" + blockId, "%rbx");
 
-                Mem.remove(condCheck);
+                remove(condCheck);
 
                 Builder.jxx(CmpInst::ICMP_EQ, getBlockId(jmpTrue));
                 Builder.jmp(getBlockId(jmpFalse));
@@ -476,36 +547,36 @@ namespace
 
         void handleCallInstruction(CallInst *Call)
         {
-            Mem.push();
+            push();
             Builder.push("%rdi");
 
-            int prior_temp = Mem.temporary;
+            int prior_temp = temporary;
 
             for (int i = 0; i < prior_temp; i++)
             {
-                Mem.push();
-                Builder.push("%_" + std::to_string(i));
+                push();
+                Builder.push("(" + std::to_string(i) + ")");
             }
 
             auto AIter = Call->arg_begin();
             if (AIter != Call->arg_end())
             {
-                std::string loc = Mem.getLocationFor(*AIter, true);
+                std::string loc = getLocationFor(*AIter, true);
                 Builder.move(loc, "%rdi");
             }
 
-            std::string resLoc = Mem.getLocationFor(Call);
+            std::string resLoc = getLocationFor(Call);
 
             Builder.call(Call->getCalledFunction());
             Builder.move("%rax", resLoc);
 
             for (int i = prior_temp - 1; i >= 0; i--)
             {
-                Mem.pop();
-                Builder.pop("%_" + std::to_string(i));
+                pop();
+                Builder.pop("(" + std::to_string(i) + ")");
             }
 
-            Mem.pop();
+            pop();
             Builder.pop("%rdi");
         }
 
@@ -514,18 +585,18 @@ namespace
             // Load value into register
             if (Value *Res = Ret->getOperand(0))
             {
-                std::string loc = Mem.getLocationFor(Res, true);
+                std::string loc = getLocationFor(Res, true);
                 Builder.move(loc, "%rax");
             }
 
             for (int i = STATIC_REGISTERS - 1; i >= 0; i--)
             {
                 auto reg = function_static_registers[i];
-                Mem.pop();
+                pop();
                 Builder.pop(reg);
             }
 
-            Mem.pop();
+            pop();
             Builder.pop("%rbp");
             Builder.ret();
         }
@@ -535,11 +606,12 @@ namespace
             Value *Op0 = Cmp->getOperand(0);
             Value *Op1 = Cmp->getOperand(1);
 
-            std::string _loc0 = Mem.getLocationFor(Op0, true);
-            std::string loc0 = Mem.getLocationFor(Op0);
+            std::string _loc0 = getLocationFor(Op0, true);
+            std::string loc0 = getLocationFor(Op0);
+            Builder.debug("oof");
             Builder.move(_loc0, loc0);
 
-            std::string loc1 = Mem.getLocationFor(Op1, true);
+            std::string loc1 = getLocationFor(Op1, true);
 
             std::string trueBlock = addBlockPrefix(std::to_string(nextBlock));
             std::string falseBlock = addBlockPrefix(std::to_string(nextBlock + 1));
@@ -551,7 +623,7 @@ namespace
 
             CmpInst::Predicate op = Cmp->getPredicate();
 
-            std::string loc = Mem.getLocationFor(Cmp);
+            std::string loc = getLocationFor(Cmp);
 
             Builder.jxx(op, trueBlock);
 
@@ -570,7 +642,7 @@ namespace
 
             // We should have the block that we arrived from in %rbx
             int incoming_blocks = PHI->getNumIncomingValues();
-            std::string loc = Mem.getLocationFor(PHI);
+            std::string loc = getLocationFor(PHI);
             std::string postPhi = addBlockPrefix(std::to_string(nextBlock + incoming_blocks));
 
             std::map<int, std::string> blockMappings;
@@ -590,8 +662,9 @@ namespace
             for (auto P : blockMappings)
             {
                 Builder.label(P.second);
-                auto placement = Mem.getLocationFor(PHI->getIncomingValue(P.first), true);
+                auto placement = getLocationFor(PHI->getIncomingValue(P.first), true);
 
+                Builder.debug("oof2");
                 Builder.move(placement, loc);
                 Builder.jmp(postPhi);
             }
@@ -607,66 +680,75 @@ namespace
             Value *Op0 = I->getOperand(0);
             Value *Op1 = I->getOperand(1);
 
-            std::string _loc0 = Mem.getLocationFor(Op0, true);
-            std::string loc0 = Mem.getLocationFor(Op0);
+            std::string _loc0 = getLocationFor(Op0, true);
+            std::string loc0 = getLocationFor(Op0);
 
-            Mem.push();
-            Builder.push(loc0);
+            if (loc0[0] == '%')
+            {
+                push();
+                Builder.push(loc0);
+            }
 
             Builder.move(_loc0, loc0);
 
-            std::string loc1 = Mem.getLocationFor(Op1, true);
+            std::string loc1 = getLocationFor(Op1, true);
 
-            std::string resLoc = Mem.getLocationFor(I);
+            Builder.debug("Before Before: " + loc1);
+
+            std::string resLoc = getLocationFor(I);
+
+            Builder.debug("Before: " + resLoc);
+            Builder.debug("Before: " + loc1);
 
             if (op == Instruction::Add)
             {
-                Builder.calc("add", loc1, loc0);
-                Builder.move(loc0, resLoc);
+                Builder.calc("add", loc1, loc0, resLoc);
             }
             else if (op == Instruction::Sub)
             {
-                Builder.calc("sub", loc1, loc0);
-                Builder.move(loc0, resLoc);
+                Builder.calc("sub", loc1, loc0, resLoc);
             }
             else if (op == Instruction::SDiv)
             {
-                Mem.push();
+                push();
                 Builder.push("%rax");
-                Mem.push();
+                push();
                 Builder.push("%rdx");
                 Builder.move("$0", "%rdx");
                 Builder.move(loc0, "%rax");
 
-                std::string _loc1 = Mem.getLocationFor(Op1, true);
-                std::string loc1 = Mem.getLocationFor(Op1);
+                std::string _loc1 = getLocationFor(Op1, true);
+                std::string loc1 = getLocationFor(Op1);
                 Builder.move(_loc1, loc1);
 
                 Builder.calc("div", loc1);
-                Mem.pop();
+                pop();
                 Builder.pop("%rdx");
                 Builder.move("%rax", resLoc);
-                Mem.pop();
+                pop();
                 Builder.pop("%rax");
             }
             else if (op == Instruction::Mul)
             {
-                std::string _loc1 = Mem.getLocationFor(Op1, true);
-                std::string loc1 = Mem.getLocationFor(Op1);
+                std::string _loc1 = getLocationFor(Op1, true);
+                std::string loc1 = getLocationFor(Op1);
                 Builder.move(_loc1, loc1);
                 Builder.move(loc0, "%rax");
                 Builder.calc("mul", loc1);
                 Builder.move("%rax", resLoc);
             }
 
-            Mem.pop();
-            Builder.pop(loc0);
+            if (loc0[0] == '%')
+            {
+                pop();
+                Builder.pop(loc0);
+            }
         }
 
         void processBlock(BasicBlock &B)
         {
 
-            Mem.startNewBlock(&B);
+            startNewBlock(&B);
 
             Builder.label(getBlockId(&B));
 
@@ -676,6 +758,9 @@ namespace
             {
                 Instruction *I = &*Iter;
                 Last = I;
+
+                Builder.label("INSTRUCTION_" + std::to_string(nextBlock));
+                nextBlock++;
 
                 if (ReturnInst *Ret = dyn_cast<ReturnInst>(I))
                 {
@@ -715,13 +800,13 @@ namespace
             }
 
             Builder.label(name);
-            Mem.push();
+            push();
             Builder.push("%rbp");
             Builder.move("%rsp", "%rbp");
 
             for (auto reg : function_static_registers)
             {
-                Mem.push();
+                push();
                 Builder.push(reg);
             }
 
@@ -729,14 +814,20 @@ namespace
 
             if (AIter != F.arg_end())
             {
-                Mem.setLocation(&*AIter, "%rdi");
+                setLocation(&*AIter, "%rdi");
             }
 
-            Mem.startNewFunction();
+            startNewFunction();
 
             for (auto &B : F)
             {
                 processBlock(B);
+            }
+
+            while (stack_offset < 0)
+            {
+                pop();
+                Builder.pop("%r8");
             }
         }
 
@@ -753,7 +844,7 @@ namespace
 
         void generate()
         {
-            std::cout << Builder.assign(Mem.getRegistersUsed());
+            std::cout << Builder.assign(getRegistersUsed());
         }
     };
 

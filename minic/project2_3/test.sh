@@ -17,10 +17,13 @@ for file in ./ll_tests/*.ll
 do
   echo "------"
   echo "Running: " $file
-  ./opt-bjc2.sh $file $file
+  opt-10 -S -load=./GeneratorPass.so --generatorpass -o ./$file.out.ll < $file > $file.s
+  as $file.s -o $file.o
+  ld $file.o -o $file_f.sh
+  chmod +x $file_f.sh
   $file\_f.sh
   echo "Recieved Output: " $?
 done
 
 
-rm -f ll_tests/*.ll.o ll_tests/*_f.sh ll_tests/*.out* ll_tests/*.sh
+rm -f ll_tests/*.ll.o  ll_tests/*.out* 
