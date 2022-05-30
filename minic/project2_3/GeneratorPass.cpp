@@ -34,10 +34,9 @@ bool contains(std::set<K> const &set, K const &key)
     return set.find(key) != set.end();
 }
 
-#define MAX_REGISTERS 12
+#define MAX_REGISTERS 11
 std::string registers[MAX_REGISTERS] = {"%rax",
                                         "%rcx",
-                                        "%rdx",
                                         "%rsi",
                                         "%r8",
                                         "%r9",
