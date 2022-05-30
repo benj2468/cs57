@@ -28,3 +28,4 @@ $(GPASS2).so: $(GPASS2).o
 clean:
 	$(RM) $(CPASS).o $(CPASS).so $(DPASS).o $(DPASS).so $(GPASS).o $(GPASS).so $(GPASS2).o $(GPASS2).so *.ll tests/*.ll *.c *.o *.s *_f.sh
 	$(RM) tests/*.o tests/*.sh tests/*.s
+	$(RM) ll_tests/*.ll.o ll_tests/*_f.sh ll_tests/*.out* ll_tests/*.ll.s

@@ -1,5 +1,5 @@
 workspace
 pass_template
 cee2
-codegen
+codegen*
 P2_samples
