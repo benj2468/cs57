@@ -22,10 +22,17 @@ My code consists of three major classes.
 
 
 1. **Generator**: Runs through Functions, BasicBlocks, and Instructions. This is the actual Pass Class.
-2. **Memory**: Handles temporary registers, and keeps a DS that maps Values to their virtual registers for future lookup.
-3. **X86Builder**: For wrapping x86 Instructions. Though each instruction is not its own class (like Ben's code), this keeps me from needing to format the lines each time I write one. This class also allows for a second pass to assign registers. (Although my assignment is not clever at this point, it very well could become clever), and the level of abstraction allows this to happen in the `assign` function.
+3. **X86Builder**: For wrapping x86 Instructions. Though each instruction is not its own class (like Ben's code), this keeps me from needing to format the lines each time I write one. This class also allows for a second pass to assign registers. (Although my assignment is not clever at this point, it very well could become clever), and the level of abstraction allows this to happen in the `assign` function. This also handles some Memory stuff:
+    -  Handles temporary registers, and keeps a DS that maps Values to their virtual registers for future lookup.
 
-Maybe some more...?
+
+My implementation sets aside a few registers for special purposes:
+- `rbx` is kept to hold the value of the previous basic block (to know where we came from)
+- `rbp` this is the base pointer, we leave this alone.
+- `rsp` this is the stack pointer, we leave it alone.
+- `rdi` as mentioned earlier is used speficially for the parameter -- we never change this within a function (unless we are calling a new function)
+
+All of the others are utilized.
 
 
 ### Pipeline

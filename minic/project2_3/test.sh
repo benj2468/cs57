@@ -19,8 +19,8 @@ do
   echo "Running: " $file
   opt-10 -S -load=./GeneratorPass.so --generatorpass -o ./$file.out.ll < $file > $file.s
   as $file.s -o $file.o
-  ld $file.o -o $file_f.sh
-  chmod +x $file_f.sh
+  ld $file.o -o $file\_f.sh
+  chmod +x $file\_f.sh
   $file\_f.sh
   echo "Recieved Output: " $?
 done

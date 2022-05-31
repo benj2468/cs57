@@ -34,11 +34,14 @@ bool contains(std::set<K> const &set, K const &key)
     return set.find(key) != set.end();
 }
 
-#define MAX_REGISTERS 9
+#define MAX_REGISTERS 12
 std::string registers[MAX_REGISTERS] = {
     "%rax",
     "%rcx",
+    "%rdx",
     "%rsi",
+    "%r8",
+    "%r9",
     "%r10",
     "%r11",
     "%r12",
@@ -161,28 +164,37 @@ namespace
 
         void move(std::string from, std::string to)
         {
-
-            std::string trueFrom = from;
-            std::string trueTo = to;
-            if (from[0] == '-')
-            {
-                trueFrom = "(%r8)";
-                move("%rbp", "%r8");
-                calc("sub", "$" + std::to_string(-stoi(from)), "%r8", "%r8");
-            }
-            if (to[0] == '-')
-            {
-                trueTo = "%r9";
-            }
             if (from != to)
             {
+                std::string trueFrom = from;
+                std::string trueTo = to;
+
+                if (from[0] == '-')
+                {
+                    push("%r8");
+                    trueFrom = "(%r8)";
+                    move("%rbp", "%r8");
+                    calc("sub", "$" + std::to_string(-stoi(from)), "%r8", "%r8");
+                }
+                if (to[0] == '-')
+                {
+                    push("%r9");
+                    trueTo = "%r9";
+                }
+
                 Instructions.push_back("mov " + trueFrom + ", " + trueTo);
-            }
-            if (to[0] == '-')
-            {
-                move("%rbp", "%r8");
-                calc("sub", "$" + std::to_string(-stoi(to)), "%r8", "%r8");
-                move("%r9", "(%r8)");
+
+                if (to[0] == '-')
+                {
+                    move("%rbp", "%r8");
+                    calc("sub", "$" + std::to_string(-stoi(to)), "%r8", "%r8");
+                    move("%r9", "(%r8)");
+                    pop("%r9");
+                }
+                if (from[0] == '-')
+                {
+                    pop("%r8");
+                }
             }
         }
         void cmp(std::string a, std::string b)
@@ -252,45 +264,75 @@ namespace
         {
             std::string trueFrom = from;
             std::string trueTo = to;
+            std::string trueDest = dest;
+
             if (from[0] == '-')
             {
-                trueFrom = "%r8";
-                move("%rbp", "%r8");
-                calc("sub", "$" + std::to_string(-stoi(from)), "%r8", "%r8");
-                move("(%r8)", "%r8");
+                trueFrom = (trueTo == "%r9") ? "%r8" : "%r9";
+                push(trueFrom);
+
+                move("%rbp", trueFrom);
+                calc("sub", "$" + std::to_string(-stoi(from)), trueFrom, trueFrom);
+                move("(" + trueFrom + ")", trueFrom);
             }
             if (to[0] == '-')
             {
-                trueTo = "%r9";
-                move("%rbp", "%r9");
-                calc("sub", "$" + std::to_string(-stoi(to)), "%r9", "%r9");
-                move("(%r9)", "%r9");
+                trueTo = (trueFrom == "%r9") ? "%r8" : "%r9";
+                push(trueTo);
+
+                move("%rbp", trueTo);
+                calc("sub", "$" + std::to_string(-stoi(to)), trueTo, trueTo);
+                move("(" + trueTo + ")", trueTo);
             }
 
             Instructions.push_back(op + " " + trueFrom + ", " + trueTo);
 
+            bool moved = false;
+            if (dest[0] == '-')
+            {
+                push("%r8");
+                push("%r9");
+                trueDest = "%r8";
+                move(trueTo, "%r9");
+                move("%rbp", trueDest);
+                calc("sub", "$" + std::to_string(-stoi(dest)), trueDest, trueDest);
+                move("%r9", "(" + trueDest + ")");
+                moved = true;
+                pop("%r9");
+                pop("%r8");
+            }
             if (to[0] == '-')
             {
-                move("%rbp", "%r8");
-                calc("sub", "$" + std::to_string(-stoi(to)), "%r8", "%r8");
-                move("%r9", dest);
+                if (!moved)
+                    move(trueTo, dest);
+                pop("%r9");
+                moved = true;
             }
-            else
+            if (from[0] == '-')
             {
-                move(to, dest);
+                if (!moved)
+                    move(trueTo, dest);
+                pop("%r8");
+                moved = true;
+            }
+            if (!moved)
+            {
+                move(trueTo, dest);
             }
         }
         void calc(std::string op, std::string to)
         {
             std::string trueTo = to;
+            push("%r8");
             if (to[0] == '-')
             {
                 trueTo = "%r8";
-                move("%rbp", "%r8");
-                calc("sub", "$" + std::to_string(-stoi(to)), "%r8", "%r8");
-                move("(%r8)", "%r8");
+                move("%rbp", trueTo);
+                calc("sub", "$" + std::to_string(-stoi(to)), trueTo, trueTo);
+                move("(%r8)", trueTo);
             }
             Instructions.push_back(op + " " + trueTo);
+            pop("%r8");
         }
 
         std::string _replaceAll(std::string str, const std::string &from, const std::string &to)
@@ -315,10 +357,10 @@ namespace
             }
             std::string res = stream.str();
 
-            for (int i = registers_used; i >= 0; i--)
-            {
-                res = _replaceAll(res, "(" + std::to_string(i) + ")", registers[i]);
-            }
+            // for (int i = registers_used; i >= 0; i--)
+            // {
+            //     res = _replaceAll(res, "(" + std::to_string(i) + ")", registers[i]);
+            // }
 
             return res;
         }
@@ -412,7 +454,7 @@ namespace
             return std::to_string(next);
         }
 
-        std::string getLocationFor(Value *V, bool constant_allow = false)
+        std::string getLocationFor(Value *V, bool constant_allow = false, std::string disallowed = "")
         {
             if (constant_allow)
             {
@@ -438,22 +480,29 @@ namespace
                     Builder.debug("Before: In function " + P.second);
                     Builder.debug("Before: In function " + P.second);
 
-                    return "(" + P.second + ")";
+                    return registers[stoi(P.second)];
                 }
             }
 
-            std::string loc = getNewLocation();
-
-            DS.insert(std::make_pair(V, loc));
-
-            if (loc[0] == '-')
+            std::string loc;
+            while (true)
             {
-                // We have a value that is on the stack...
-                return loc;
-            }
-            else
-            {
-                return "(" + loc + ")";
+                loc = getNewLocation();
+
+                if (loc[0] == '-')
+                {
+                    DS.insert(std::make_pair(V, loc));
+                    return loc;
+                }
+                else
+                {
+                    auto reg = registers[stoi(loc)];
+                    if (reg != disallowed)
+                    {
+                        DS.insert(std::make_pair(V, loc));
+                        return reg;
+                    }
+                }
             }
         }
         void setLocation(Value *V, std::string loc)
@@ -555,7 +604,7 @@ namespace
             for (int i = 0; i < prior_temp; i++)
             {
                 push();
-                Builder.push("(" + std::to_string(i) + ")");
+                Builder.push(registers[i]);
             }
 
             auto AIter = Call->arg_begin();
@@ -573,7 +622,7 @@ namespace
             for (int i = prior_temp - 1; i >= 0; i--)
             {
                 pop();
-                Builder.pop("(" + std::to_string(i) + ")");
+                Builder.pop(registers[i]);
             }
 
             pop();
@@ -718,7 +767,7 @@ namespace
                 Builder.move(loc0, "%rax");
 
                 std::string _loc1 = getLocationFor(Op1, true);
-                std::string loc1 = getLocationFor(Op1);
+                std::string loc1 = getLocationFor(Op1, false, "%rdx");
                 Builder.move(_loc1, loc1);
 
                 Builder.calc("div", loc1);
