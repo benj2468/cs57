@@ -404,30 +404,37 @@ namespace
         }
 
         // Get a new location, prefer register space, otherwise pick current offset
-        std::string getNewLocation()
+        std::string getNewLocation(std::string disallowed)
         {
-            int next = temporary;
+            // Default to temporary, which should be low
+            int next = registers[temporary] == disallowed ? temporary + 1 : temporary;
             for (int i = 0; i < temporary; i++)
             {
+                // If for some reason we've freed a spot smaller than temporary, lets go with that one!
                 bool found = false;
                 for (auto P : DS)
                 {
-                    if (P.second[0] != '%' && stoi(P.second) == i)
+                    if ((P.second[0] != '%' && stoi(P.second) == i) || P.second == disallowed)
+                    {
                         found = true;
+                        break;
+                    }
                 }
                 if (!found)
                 {
                     next = i;
+                    break;
                 }
             }
             if (next == temporary)
                 temporary++;
 
+            // If we are trying to use a register that we don't have access to, then we need to default to using the stack.
             if (next >= MAX_REGISTERS)
             {
                 // There are no more registers, so we need to allocate space for this value on the stack...
                 push();
-                return std::to_string(stack_offset - 8);
+                return std::to_string(stack_offset - REGISTER_SIZE);
             }
 
             return std::to_string(next);
@@ -451,43 +458,40 @@ namespace
             {
                 if (P.first == V)
                 {
-                    if (P.second[0] == '%')
+                    // If it's a standard register (rdi) or a stack offset, return that string
+                    if (P.second[0] == '%' || P.second[0] == '-')
                     {
                         return P.second;
                     }
-                    else if (P.second[0] == '-')
-                    {
-                        return P.second;
-                    }
+
+                    // Otherwise what's stored is a reigster number, so lets get the register name
 
                     return registers[stoi(P.second)];
                 }
             }
+            // Get a new location, that is not disallowed
+            std::string loc = getNewLocation(disallowed);
 
-            std::string loc;
-            while (true)
+            if (loc[0] == '-')
             {
-                loc = getNewLocation();
-
-                if (loc[0] == '-')
-                {
-                    DS.insert(std::make_pair(V, loc));
-                    return loc;
-                }
-                else
-                {
-                    auto reg = registers[stoi(loc)];
-                    if (reg != disallowed)
-                    {
-                        DS.insert(std::make_pair(V, loc));
-                        return reg;
-                    }
-                }
+                DS.insert(std::make_pair(V, loc));
+                return loc;
             }
+
+            auto reg = registers[stoi(loc)];
+            if (reg != disallowed)
+            {
+                DS.insert(std::make_pair(V, loc));
+                return reg;
+            }
+
+            errs() << "PICKED AN INVALID REGISTER\n";
+            exit(EXIT_FAILURE);
         }
 
         // Sets the location of a value manually to loc.
-        void setLocation(Value *V, std::string loc)
+        void
+        setLocation(Value *V, std::string loc)
         {
             for (auto P : DS)
             {
