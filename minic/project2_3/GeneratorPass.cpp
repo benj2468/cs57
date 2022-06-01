@@ -20,6 +20,8 @@ using namespace llvm;
 // Change the DEBUG_TYPE define to the friendly name of your pass
 #define DEBUG_TYPE "generatorpass"
 
+#define REGISTER_SIZE 8
+
 #define STATIC_REGISTERS 5
 std::string function_static_registers[STATIC_REGISTERS] = {"%rbx", "%r12", "%r13", "%r14", "%r15"};
 
@@ -35,6 +37,7 @@ bool contains(std::set<K> const &set, K const &key)
 }
 
 #define MAX_REGISTERS 12
+// The Registers we will use
 std::string registers[MAX_REGISTERS] = {
     "%rax",
     "%rcx",
@@ -49,6 +52,7 @@ std::string registers[MAX_REGISTERS] = {
     "%r14",
     "%r15"};
 
+// Helpers, these are drawn from Ben's Code
 namespace helpers
 {
     // Helper method to x86Program::dust_out_slots
@@ -133,26 +137,26 @@ namespace helpers
     }
 }
 
-// Beginning of anonymous namespace. Keeping it anonymous prevents duplicate
-// namespaces from occurring, especially when merging code into the LLVM
-// pass directory (which we will not be doing.)
 namespace
 {
-
+    // Structure for building the x86 instructions.
     struct X86Builder
     {
         std::vector<std::string> Instructions;
 
+        // Write a comment
         void debug(std::string str)
         {
             Instructions.push_back("# " + str);
         }
 
+        // Start the module
         void start()
         {
             Instructions.push_back(".globl _start");
         }
 
+        // Close the module
         void close()
         {
             label("_start");
@@ -162,6 +166,7 @@ namespace
             Instructions.push_back("int $128");
         }
 
+        // Create a move instruction: `mov <from>, <to>`
         void move(std::string from, std::string to)
         {
             if (from != to)
@@ -197,26 +202,33 @@ namespace
                 }
             }
         }
+
+        // Create a compare instruction: `cmp <a>, <b>`
         void cmp(std::string a, std::string b)
         {
             Instructions.push_back("cmp " + a + ", " + b);
         }
+        // Create a push instruction: `push <reg>`
         void push(std::string reg)
         {
             Instructions.push_back("push " + reg);
         }
+        // Create a pop instruction: `pop <reg>`
         void pop(std::string reg)
         {
             Instructions.push_back("pop " + reg);
         }
+        // Create a return instruction: `ret`
         void ret()
         {
             Instructions.push_back("ret\n");
         }
+        // Create a jmp instruction: `jmp <dest>`
         void jmp(std::string dest)
         {
             Instructions.push_back("jmp " + dest);
         }
+        // Create a predicated jump instrction `j<pred> dest`
         void jxx(CmpInst::Predicate pred, std::string dest)
         {
             if (pred == CmpInst::ICMP_EQ)
@@ -246,20 +258,24 @@ namespace
                 Instructions.push_back("jne " + dest);
             };
         }
+        // Create a call instruction: `call <F.name>`
         void call(Function *F)
         {
             std::string name = F->getName();
             call(name);
         }
+        // Create a call instruction: `call <dest>`
         void call(std::string dest)
         {
             Instructions.push_back("call " + dest);
         }
+        // Create a label: `<label>:`
         void label(std::string label)
         {
             Instructions.push_back(label + ":");
         }
 
+        // Create a calculation {add, sub} instruction: `op from to` + `mov to dest`
         void calc(std::string op, std::string from, std::string to, std::string dest)
         {
             std::string trueFrom = from;
@@ -320,6 +336,8 @@ namespace
                 move(trueTo, dest);
             }
         }
+
+        // Create a calculation instruciton {mul, div}: `op <to>` [result stored in %rax]
         void calc(std::string op, std::string to)
         {
             std::string trueTo = to;
@@ -335,91 +353,57 @@ namespace
             pop("%r8");
         }
 
-        std::string _replaceAll(std::string str, const std::string &from, const std::string &to)
+        // Historical name assign was to assign registers to temporary values, not necessary anymore due to smart stack use.
+        // Now it just combines all the lines.
+        std::string assign()
         {
-            size_t start_pos = 0;
-            while ((start_pos = str.find(from, start_pos)) != std::string::npos)
-            {
-                str.replace(start_pos, from.length(), to);
-                start_pos += to.length(); // Handles case where 'to' is a substring of 'from'
-            }
-            return str;
-        }
-
-        std::string assign(int registers_used)
-        {
-            assert(registers_used <= MAX_REGISTERS);
-
             std::stringstream stream;
             for (auto I : Instructions)
             {
                 stream << I << "\n";
             }
-            std::string res = stream.str();
-
-            // for (int i = registers_used; i >= 0; i--)
-            // {
-            //     res = _replaceAll(res, "(" + std::to_string(i) + ")", registers[i]);
-            // }
-
-            return res;
+            return stream.str();
         }
     };
 
-    struct Generator
+    // Structure holds memory data, including where values are stored.
+    struct Memory
     {
-        X86Builder Builder;
-        std::map<BasicBlock *, int> Blocks;
-        int nextBlock = 0;
-        std::map<Value *, Use *> NoMoreUses;
-
-        /*
-
-        Stuff For memory managment
-
-        */
-
-        // There needs to be some data structure here that maps values to locations
+        // Value -> location mapping
+        // Location can be a register, or an offset from the base pointer
         std::map<Value *, std::string> DS;
-        int registers_used = 0;
+        // Temporary count, fluid as we assign/unassign registers.
         int temporary = 0;
+        // Current block, used for future value use checking (Ben's code)
         BasicBlock *CurrentBlock;
+        // Current stack offset
         int stack_offset = 0;
 
+        // Incrase Stack offset
         void push()
         {
-            stack_offset -= 8;
+            stack_offset -= REGISTER_SIZE;
         }
+        // Decrease stack offset
         void pop()
         {
-            stack_offset += 8;
+            stack_offset += REGISTER_SIZE;
         }
 
+        // Start a new block
         void
         startNewBlock(BasicBlock *B)
         {
             CurrentBlock = B;
         }
 
+        // Start a new function, i.e. set temproary back to zero
         void startNewFunction()
         {
             temporary = 0;
         }
 
-        int registerStringToInt(std::string reg)
-        {
-            if (reg[0] == '%')
-            {
-                return -1;
-            }
-            return stoi(reg);
-        }
-
-        int getRegistersUsed()
-        {
-            return registers_used + 1;
-        }
-
+        // Get a new location, prefer register space, otherwise pick current offset
         std::string getNewLocation()
         {
             int next = temporary;
@@ -428,7 +412,7 @@ namespace
                 bool found = false;
                 for (auto P : DS)
                 {
-                    if (registerStringToInt(P.second) == i)
+                    if (P.second[0] != '%' && stoi(P.second) == i)
                         found = true;
                 }
                 if (!found)
@@ -444,16 +428,15 @@ namespace
                 // There are no more registers, so we need to allocate space for this value on the stack...
                 push();
                 return std::to_string(stack_offset - 8);
-
-                errs()
-                    << "UNABLE TO SUPPORT MORE THAN " << MAX_REGISTERS << " REGISTERS AT THE CURRENT MOMENT\n";
-                exit(EXIT_FAILURE);
             }
-            registers_used = std::max(registers_used, next);
 
             return std::to_string(next);
         }
 
+        // Get the location for a value
+        //
+        // @param constant_allow (bool, default = false) : if true, and value is a constant, will return $<val>
+        // @param disallowed (string [future should be iterator], default = "") : if set, disallows assignment to given reigster.
         std::string getLocationFor(Value *V, bool constant_allow = false, std::string disallowed = "")
         {
             if (constant_allow)
@@ -468,7 +451,6 @@ namespace
             {
                 if (P.first == V)
                 {
-                    Builder.debug("Found... " + P.second);
                     if (P.second[0] == '%')
                     {
                         return P.second;
@@ -477,8 +459,6 @@ namespace
                     {
                         return P.second;
                     }
-                    Builder.debug("Before: In function " + P.second);
-                    Builder.debug("Before: In function " + P.second);
 
                     return registers[stoi(P.second)];
                 }
@@ -505,6 +485,8 @@ namespace
                 }
             }
         }
+
+        // Sets the location of a value manually to loc.
         void setLocation(Value *V, std::string loc)
         {
             for (auto P : DS)
@@ -520,6 +502,7 @@ namespace
             DS.insert(P);
         }
 
+        // Removes a location from the data store
         void remove(std::string loc)
         {
             for (auto P : DS)
@@ -531,19 +514,25 @@ namespace
                 }
             }
         }
+    };
 
-        /*
-
-        End of Memory Stuff
-
-
-        */
+    // Generator/Memory Structure.
+    struct Generator
+    {
+        X86Builder Builder;
+        Memory Mem;
+        std::map<BasicBlock *, int> Blocks;
+        int nextBlock = 0;
+        std::map<Value *, Use *> NoMoreUses;
 
     public:
         Generator()
         {
         }
 
+        // Helper function that uses the Blocks DS to get the blockID used in labeling basic blocks
+        //
+        // @param with_prefix (bool, default = true) : if you set this to false, you won't get the __ prefix before a block label.
         std::string getBlockId(BasicBlock *B, bool with_prefix = true)
         {
             auto search = Blocks.find(B);
@@ -564,10 +553,12 @@ namespace
             }
         }
 
+        // Handle a LLVM Branch Instruction
         void handleBranchInstruction(BranchInst *Branch)
         {
             BasicBlock *jmpTrue = Branch->getSuccessor(0);
             std::string blockId = getBlockId(dyn_cast<BasicBlock>(Branch->getParent()), false);
+            // For conditional branches, we need to check the value of the conditional, which we should have already seen and should have been set to a value.
             if (Branch->isConditional())
             {
                 Value *V = Branch->getCondition();
@@ -575,77 +566,87 @@ namespace
                 jmpTrue = Branch->getSuccessor(0);
                 BasicBlock *jmpFalse = Branch->getSuccessor(1);
 
-                std::string condCheck = getLocationFor(V, true);
+                std::string condCheck = Mem.getLocationFor(V, true);
 
                 Builder.cmp("$1", condCheck);
+                // Always indicate which block we are coming from before we exit a block
                 Builder.move("$" + blockId, "%rbx");
 
-                remove(condCheck);
+                Mem.remove(condCheck);
 
                 Builder.jxx(CmpInst::ICMP_EQ, getBlockId(jmpTrue));
                 Builder.jmp(getBlockId(jmpFalse));
             }
+            // If it is not a conditional, we just branch.
             else
             {
-
-                // Indicate which block we are coming from...
+                // Always indicate which block we are coming from before we exit a block
                 Builder.move("$" + blockId, "%rbx");
                 Builder.jmp(getBlockId(jmpTrue));
             }
         }
 
+        // Handle an LLVM Call Instruction
         void handleCallInstruction(CallInst *Call)
         {
-            push();
+            Mem.push();
             Builder.push("%rdi");
 
-            int prior_temp = temporary;
+            int prior_temp = Mem.temporary;
 
+            // Push all of our registers that we are still using.
             for (int i = 0; i < prior_temp; i++)
             {
-                push();
+                Mem.push();
                 Builder.push(registers[i]);
             }
 
+            // Set our argument if we have one.
             auto AIter = Call->arg_begin();
             if (AIter != Call->arg_end())
             {
-                std::string loc = getLocationFor(*AIter, true);
+                std::string loc = Mem.getLocationFor(*AIter, true);
                 Builder.move(loc, "%rdi");
             }
 
-            std::string resLoc = getLocationFor(Call);
+            std::string resLoc = Mem.getLocationFor(Call);
 
             Builder.call(Call->getCalledFunction());
+            // Move our result into the location we know.
             Builder.move("%rax", resLoc);
 
+            // Pop back all of our registers
             for (int i = prior_temp - 1; i >= 0; i--)
             {
-                pop();
+                Mem.pop();
                 Builder.pop(registers[i]);
             }
 
-            pop();
+            Mem.pop();
             Builder.pop("%rdi");
         }
 
+        // Handle LLVM Return Instruction
         void handleReturnInstruction(ReturnInst *Ret)
         {
             // Load value into register
             if (Value *Res = Ret->getOperand(0))
             {
-                std::string loc = getLocationFor(Res, true);
+                std::string loc = Mem.getLocationFor(Res, true);
                 Builder.move(loc, "%rax");
             }
 
+            // Pop all of the static registers that should be fixed (these were pushed at the beginning)
+            //
+            // Make sure we get them in reverse order here
             for (int i = STATIC_REGISTERS - 1; i >= 0; i--)
             {
                 auto reg = function_static_registers[i];
-                pop();
+                Mem.pop();
                 Builder.pop(reg);
             }
 
-            pop();
+            Mem.pop();
             Builder.pop("%rbp");
             Builder.ret();
         }
@@ -655,52 +656,65 @@ namespace
             Value *Op0 = Cmp->getOperand(0);
             Value *Op1 = Cmp->getOperand(1);
 
-            std::string _loc0 = getLocationFor(Op0, true);
-            std::string loc0 = getLocationFor(Op0);
-            Builder.debug("oof");
+            std::string _loc0 = Mem.getLocationFor(Op0, true);
+            std::string loc0 = Mem.getLocationFor(Op0);
+            // We move in the literal into an actual location, so that we can compare it
             Builder.move(_loc0, loc0);
 
-            std::string loc1 = getLocationFor(Op1, true);
+            std::string loc1 = Mem.getLocationFor(Op1, true);
 
+            // Setup block labels for each block
             std::string trueBlock = addBlockPrefix(std::to_string(nextBlock));
             std::string falseBlock = addBlockPrefix(std::to_string(nextBlock + 1));
             std::string postBlock = addBlockPrefix(std::to_string(nextBlock + 2));
 
             nextBlock += 3;
 
-            Builder.cmp(loc1, loc0);
-
             CmpInst::Predicate op = Cmp->getPredicate();
 
-            std::string loc = getLocationFor(Cmp);
+            // This location will store the value $0 if false, $1 if true
+            std::string loc = Mem.getLocationFor(Cmp);
 
+            // Make our comparison
+            Builder.cmp(loc1, loc0);
+
+            // Jump based on predicate to the true Block
             Builder.jxx(op, trueBlock);
 
+            // Otherwise we continue into the false block (I guess this doesn't actually need a label...)
             Builder.label(falseBlock);
             Builder.move("$0", loc);
             Builder.jmp(postBlock);
 
+            // True Block
             Builder.label(trueBlock);
             Builder.move("$1", loc);
 
+            // Once done, continue to Post Block
             Builder.label(postBlock);
         }
 
+        // Handle LLVM PHI Node
         void handlePHINode(PHINode *PHI)
         {
-
-            // We should have the block that we arrived from in %rbx
+            // Count of incoming blocks
             int incoming_blocks = PHI->getNumIncomingValues();
-            std::string loc = getLocationFor(PHI);
+
+            // This location will hold the value of the PHI decision.
+            std::string loc = Mem.getLocationFor(PHI);
             std::string postPhi = addBlockPrefix(std::to_string(nextBlock + incoming_blocks));
 
             std::map<int, std::string> blockMappings;
+            // For each incoming block, give it a label so we can jump to it. This is simply a building a DS
             for (int incoming = 0; incoming < incoming_blocks; incoming++)
             {
                 std::string from_block = addBlockPrefix(std::to_string(nextBlock + incoming));
                 blockMappings.insert(std::make_pair(incoming, from_block));
             }
             nextBlock += (incoming_blocks + 1);
+
+            // For each block
+            // If the value in %rbx, which is the last basic block we exited, is equal to this blocks ID, then jump to that block's label.
             for (auto P : blockMappings)
             {
                 BasicBlock *B = PHI->getIncomingBlock(P.first);
@@ -708,19 +722,26 @@ namespace
                 Builder.jxx(CmpInst::ICMP_EQ, P.second);
             }
 
+            // Build each PHI option's block
             for (auto P : blockMappings)
             {
+                // Label it
                 Builder.label(P.second);
-                auto placement = getLocationFor(PHI->getIncomingValue(P.first), true);
+                auto placement = Mem.getLocationFor(PHI->getIncomingValue(P.first), true);
 
-                Builder.debug("oof2");
+                // The placement is the value given to the PHI node if we come from this block
+                // So let's set it to the PHI nodes value location
                 Builder.move(placement, loc);
+
+                // And finaly jump to the end.
                 Builder.jmp(postPhi);
             }
 
+            // Label to end..
             Builder.label(postPhi);
         }
 
+        // Handle LLVM Arithmetic Instructions
         void
         handleRemainingInstruction(Instruction *I)
         {
@@ -729,25 +750,21 @@ namespace
             Value *Op0 = I->getOperand(0);
             Value *Op1 = I->getOperand(1);
 
-            std::string _loc0 = getLocationFor(Op0, true);
-            std::string loc0 = getLocationFor(Op0);
+            std::string _loc0 = Mem.getLocationFor(Op0, true);
+            std::string loc0 = Mem.getLocationFor(Op0);
 
+            // If loc0 was in a register, push it's value cause we don't want to lose it.
             if (loc0[0] == '%')
             {
-                push();
+                Mem.push();
                 Builder.push(loc0);
             }
 
             Builder.move(_loc0, loc0);
 
-            std::string loc1 = getLocationFor(Op1, true);
+            std::string loc1 = Mem.getLocationFor(Op1, true);
 
-            Builder.debug("Before Before: " + loc1);
-
-            std::string resLoc = getLocationFor(I);
-
-            Builder.debug("Before: " + resLoc);
-            Builder.debug("Before: " + loc1);
+            std::string resLoc = Mem.getLocationFor(I);
 
             if (op == Instruction::Add)
             {
@@ -759,55 +776,72 @@ namespace
             }
             else if (op == Instruction::SDiv)
             {
-                push();
+                // Save our old value of %rax
+                Mem.push();
                 Builder.push("%rax");
-                push();
+                // save our old value of %rdx
+                Mem.push();
                 Builder.push("%rdx");
+                // For division we need 0 to be in rdx
                 Builder.move("$0", "%rdx");
+                // %rax must be the numerator, so let's set it as such
                 Builder.move(loc0, "%rax");
 
-                std::string _loc1 = getLocationFor(Op1, true);
-                std::string loc1 = getLocationFor(Op1, false, "%rdx");
+                std::string _loc1 = Mem.getLocationFor(Op1, true);
+                std::string loc1 = Mem.getLocationFor(Op1, false, "%rdx");
+                // Move in our denominator
                 Builder.move(_loc1, loc1);
 
+                // Perform division
                 Builder.calc("div", loc1);
-                pop();
+                // Return old %rdx, we don't care about the remainder
+                Mem.pop();
                 Builder.pop("%rdx");
+                // Move our result into the proper location
                 Builder.move("%rax", resLoc);
-                pop();
+                // Return old %rax
+                Mem.pop();
                 Builder.pop("%rax");
             }
             else if (op == Instruction::Mul)
             {
-                std::string _loc1 = getLocationFor(Op1, true);
-                std::string loc1 = getLocationFor(Op1);
+                std::string _loc1 = Mem.getLocationFor(Op1, true);
+                std::string loc1 = Mem.getLocationFor(Op1);
                 Builder.move(_loc1, loc1);
+                Builder.debug("----------------");
+                // Multiply by %rax, so move one value in there
                 Builder.move(loc0, "%rax");
                 Builder.calc("mul", loc1);
+                // move result into proper location
                 Builder.move("%rax", resLoc);
+                Builder.debug("----------------");
             }
 
+            // Return old value back to proper location
             if (loc0[0] == '%')
             {
-                pop();
+                Mem.pop();
                 Builder.pop(loc0);
             }
         }
 
+        // Process an LLVM block
         void processBlock(BasicBlock &B)
         {
 
-            startNewBlock(&B);
+            // Start new block
+            Mem.startNewBlock(&B);
 
+            // Label it
             Builder.label(getBlockId(&B));
 
+            // Iterate over all instructions in block
             BasicBlock::iterator Iter = B.begin();
-            Instruction *Last;
             while (Iter != B.end())
             {
                 Instruction *I = &*Iter;
-                Last = I;
 
+                // Label each instruction just for easier development
                 Builder.label("INSTRUCTION_" + std::to_string(nextBlock));
                 nextBlock++;
 
@@ -840,60 +874,75 @@ namespace
             }
         }
 
+        // Process LLVM Function
         void processFunction(Function &F)
         {
+            // Ignore llvm ones
             std::string name = F.getName();
             if (name.find("llvm") == 0)
             {
                 return;
             }
 
+            // Label it
             Builder.label(name);
-            push();
+
+            // Classic Function Setup
+            Mem.push();
             Builder.push("%rbp");
             Builder.move("%rsp", "%rbp");
 
             for (auto reg : function_static_registers)
             {
-                push();
+                Mem.push();
                 Builder.push(reg);
             }
 
             auto AIter = F.arg_begin();
 
+            // Set argument to be in %rdi
             if (AIter != F.arg_end())
             {
-                setLocation(&*AIter, "%rdi");
+                Mem.setLocation(&*AIter, "%rdi");
             }
 
-            startNewFunction();
+            // Start it
+            Mem.startNewFunction();
 
+            // Process each block
             for (auto &B : F)
             {
                 processBlock(B);
             }
 
-            while (stack_offset < 0)
+            // Close it off properly
+            while (Mem.stack_offset < 0)
             {
-                pop();
+                Mem.pop();
                 Builder.pop("%r8");
             }
         }
 
+        // Process LLVM module
         void processModule(Module &M)
         {
+            // Start out module
             Builder.start();
 
+            // Process each function
             for (auto &F : M)
             {
                 processFunction(F);
             }
+
+            // Close off module
             Builder.close();
         }
 
+        // Perform the actual generation to stdout
         void generate()
         {
-            std::cout << Builder.assign(getRegistersUsed());
+            std::cout << Builder.assign();
         }
     };
 
